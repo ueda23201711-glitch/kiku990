@@ -374,7 +374,7 @@
 
     /* Prevent iOS selection/callout while drawing */
     #card-area, .note-area, .draw-toolbar, .tool-row, .option-row, .range-inline, .color-row,
-    .tool-btn, .swatch, #pen-size-label, #btn-show-meaning, #txt-word, #txt-meaning {
+    .tool-btn, .swatch, #pen-size-label, #btn-show-meaning,  {
         -webkit-user-select: none;
         user-select: none;
         -webkit-touch-callout: none;
@@ -516,6 +516,16 @@
 
     /* Ensure draw-toolbar is column on desktop too (CSS safety net) */
     .note-area #draw-toolbar{ flex-direction: column !important; align-items: stretch !important; }
+
+
+/* === Allow text selection on word/meaning (iPhone long-press copy) === */
+.word-text, .meaning-text, {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  -webkit-touch-callout: default !important;
+  touch-action: auto !important;
+  pointer-events: auto !important;
+}
 
 </style>
 </head>
@@ -2585,6 +2595,16 @@ function updateLv(n, lv) {
     st.level = parseInt(lv);
     saveStatus(n, st);
 }
+
+// === Make word/meaning selectable (avoid swipe handlers cancelling long-press) ===
+(function(){
+  const w = document.getElementById('txt-word');
+  const m = document.getElementById('txt-meaning');
+  const stop = (e)=>{ e.stopPropagation(); };
+  if(w){ w.addEventListener('pointerdown', stop, {passive:true}); w.addEventListener('touchstart', stop, {passive:true}); }
+  if(m){ m.addEventListener('pointerdown', stop, {passive:true}); m.addEventListener('touchstart', stop, {passive:true}); }
+})();
+
 </script>
 </body>
 </html>
