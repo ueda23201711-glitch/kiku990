@@ -519,7 +519,7 @@
 
 
 /* === Allow text selection on word/meaning (iPhone long-press copy) === */
-.word-text, .meaning-text, {
+.word-text, .meaning-text {
   -webkit-user-select: text !important;
   user-select: text !important;
   -webkit-touch-callout: default !important;
@@ -2283,19 +2283,21 @@ function setupSwipeHandlers() {
 
     card.addEventListener('touchstart', (e) => {
         if (e.target.closest('.note-area')) return;
+        if (e.target.closest('#txt-word') || e.target.closest('#txt-meaning')) return;
         touchStartPos.x = e.touches[0].clientX;
         touchStartPos.y = e.touches[0].clientY;
     }, {passive:true});
 
     card.addEventListener('touchend', (e) => {
         if (e.target.closest('.note-area')) return;
+        if (e.target.closest('#txt-word') || e.target.closest('#txt-meaning')) return;
         touchEndPos.x = e.changedTouches[0].clientX;
         touchEndPos.y = e.changedTouches[0].clientY;
         handleSwipe();
     }, {passive:true});
 
     card.addEventListener('click', (e) => {
-        if (e.target.closest('button') || e.target.closest('.note-area') || e.target.closest('textarea')) return;
+        if (e.target.closest('button') || e.target.closest('.note-area') || e.target.closest('textarea') || e.target.closest('#txt-word') || e.target.closest('#txt-meaning')) return;
         playWord(e);
     });
 }

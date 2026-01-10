@@ -3,8 +3,8 @@
   "short_name": "TOEIC990",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#802028",
-  "theme_color": "#802028",
+  "background_color": "#8A0E4B",
+  "theme_color": "#8A0E4B",
   "icons": [
     {
       "src": "./icons/toeic990-192.png",
