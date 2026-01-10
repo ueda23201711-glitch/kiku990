@@ -746,11 +746,70 @@
         <div class="panel" style="margin-top:10px;">
             <textarea id="data-editor" placeholder="word	meaning	number (TAB区切り)"></textarea>
             <button class="btn-secondary btn-block" onclick="updateMasterData()">データを更新保存</button>
+            <button class="btn-danger btn-block" onclick="resetAllData()">⚠ 全データ初期化</button>
         </div>
         <button class="btn-primary btn-block" onclick="goHome()">設定に戻る</button>
     </div>
 
 <script>
+// === Storage namespace (per series) ===
+const APP_PREFIX = "kikutan_toeic990__";
+const k = (name) => APP_PREFIX + name;
+
+// Basic wrappers (use names WITHOUT prefix)
+const lsGet = (name) => localStorage.getItem(k(name));
+const lsSet = (name, value) => localStorage.setItem(k(name), value);
+const lsRemove = (name) => localStorage.removeItem(k(name));
+
+// One-time migration from legacy (non-prefixed) keys (so existing users keep their data)
+(function migrateLegacyOnce(){
+  const marker = k("__migrated_v1");
+  if (localStorage.getItem(marker)) return;
+
+  const legacyToNew = [
+    ["kikutan_master_tsv", k("master_tsv")],
+    ["kikutan_theme_title", k("theme_title")],
+    ["kikutan_theme_color", k("theme_color")],
+  ];
+
+  // copy simple keys if new doesn't exist yet
+  for (const [oldK, newK] of legacyToNew) {
+    if (localStorage.getItem(oldK) !== null && localStorage.getItem(newK) === null) {
+      localStorage.setItem(newK, localStorage.getItem(oldK));
+    }
+  }
+
+  // copy per-card keys
+  const reKeys = [/^kikutan_stat_\d+$/, /^kikutan_memo_text_\d+$/, /^kikutan_memo_ink_\d+$/];
+  for (let i = 0; i < localStorage.length; i++) {
+    const keyName = localStorage.key(i);
+    if (!keyName) continue;
+    if (!reKeys.some(r => r.test(keyName))) continue;
+    const newKeyName = k(keyName.replace(/^kikutan_/, "")); // stat_123 / memo_text_123 / memo_ink_123
+    if (localStorage.getItem(newKeyName) === null) {
+      localStorage.setItem(newKeyName, localStorage.getItem(keyName));
+    }
+  }
+
+  localStorage.setItem(marker, "1");
+})();
+
+// Reset only this series' data
+function resetAllData(){
+  const ok = confirm("このシリーズ（TOEIC990）の学習履歴・メモ・手書きメモなどをすべて初期化します。\n本当に実行しますか？");
+  if (!ok) return;
+
+  // remove all keys with prefix
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const keyName = localStorage.key(i);
+    if (keyName && keyName.startsWith(APP_PREFIX)) {
+      localStorage.removeItem(keyName);
+    }
+  }
+  alert("初期化しました。ページを再読み込みします。");
+  location.reload();
+}
+
 let masterTsv = `premium	(名) 保険料、手当 (形) 高級な	1
 beverage	(名) 飲み物、飲料	2
 itinerary	(名) 旅行日程、旅程	3
@@ -1898,17 +1957,17 @@ let canvasDpr = 1;
 let memoSaveTimer = null;
 let drawSaveTimer = null;
 
-function memoTextKey(n){ return 'kikutan_memo_text_' + n; }
-function memoInkKey(n){ return 'kikutan_memo_ink_' + n; }
+function memoTextKey(n){ return k('memo_text_' + n); }
+function memoInkKey(n){ return k('memo_ink_' + n); }
 
 window.onload = function() {
-    const savedData = localStorage.getItem('kikutan_master_tsv');
+    const savedData = lsGet('master_tsv');
     if (savedData) masterTsv = savedData;
     document.getElementById('data-editor').value = masterTsv.trim();
 
-    const savedTitle = localStorage.getItem('kikutan_theme_title');
+    const savedTitle = lsGet('theme_title');
     if (savedTitle) document.getElementById('inpTitle').value = savedTitle;
-    const savedColor = localStorage.getItem('kikutan_theme_color');
+    const savedColor = lsGet('theme_color');
     if (savedColor) document.getElementById('inpColor').value = savedColor;
 
     updateTheme(false);
@@ -2054,8 +2113,8 @@ function updateTheme(shouldSave = true) {
     document.documentElement.style.setProperty('--primary', color);
     document.documentElement.style.setProperty('--primary-light', color + "cc");
     if (shouldSave) {
-        localStorage.setItem('kikutan_theme_title', title);
-        localStorage.setItem('kikutan_theme_color', color);
+        lsSet('theme_title', title);
+        lsSet('theme_color', color);
     }
 }
 
@@ -2083,7 +2142,7 @@ function refreshMainStats() {
 
 function updateMasterData() {
     masterTsv = document.getElementById('data-editor').value;
-    localStorage.setItem('kikutan_master_tsv', masterTsv);
+    lsSet('master_tsv', masterTsv);
     parseData();
     refreshMainStats();
     alert("データを保存しました。");
@@ -2116,13 +2175,13 @@ function stopAllAudio() {
 }
 
 function getStatus(n) {
-    const key = 'kikutan_stat_' + n;
+    const key = k('stat_' + n);
     const data = localStorage.getItem(key);
     return data ? JSON.parse(data) : { level: 0, result: "new" };
 }
 
 function saveStatus(n, status) {
-    localStorage.setItem('kikutan_stat_' + n, JSON.stringify(status));
+    localStorage.setItem(k('stat_' + n), JSON.stringify(status));
 }
 
 function startApp(mode) {
