@@ -653,8 +653,8 @@
             <div id="badge-lv" class="badge">LV.0</div>
             <button class="btn-audio" id="btn-audio" title="発音をもう一度" onclick="playWord(event)">🔊</button>
 
-            <div id="txt-word" class="word-text" onclick="playWord(event)">Word</div>
-            <div id="txt-meaning" class="meaning-text hidden">意味</div>
+            <div id="txt-word" class="word-text" onclick="playWord(event)" lang="en">Word</div>
+            <div id="txt-meaning" class="meaning-text hidden" lang="ja">意味</div>
 
             <button id="btn-show-meaning" class="btn-neutral" style="margin-top:10px; font-size:0.85rem; padding:8px 18px; border-radius:20px;" onclick="revealMeaning()">
                 日本語訳を表示
@@ -2655,6 +2655,30 @@ if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./sw.js").catch(() => {});
   });
 }
+</script>
+
+
+<script>
+/* kikutan-lang-hint */
+(function () {
+  function applyLang() {
+    const w = document.getElementById("txt-word");
+    const m = document.getElementById("txt-meaning");
+    if (w) w.setAttribute("lang", "en");
+    if (m) m.setAttribute("lang", "ja");
+  }
+  applyLang();
+
+  // Re-apply when text updates (flashcards change DOM text)
+  const obs = new MutationObserver(applyLang);
+  window.addEventListener("load", () => {
+    applyLang();
+    const w = document.getElementById("txt-word");
+    const m = document.getElementById("txt-meaning");
+    if (w) obs.observe(w, { childList: true, subtree: true, characterData: true });
+    if (m) obs.observe(m, { childList: true, subtree: true, characterData: true });
+  });
+})();
 </script>
 
 </body>
