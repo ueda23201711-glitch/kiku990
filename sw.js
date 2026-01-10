@@ -1,36 +1,25 @@
-// Simple service worker for GitHub Pages PWA
-const CACHE_NAME = "kikutan-toeic990-v1";
-const ASSETS = [
+const CACHE_NAME="kikutan-toeic990-v3";
+const ASSETS=[
   "./",
   "./index.html",
   "./manifest.webmanifest",
   "./icons/toeic990-192.png",
   "./icons/toeic990-512.png",
+  "./icons/toeic990-maskable-192.png",
+  "./icons/toeic990-maskable-512.png",
   "./icons/apple-touch-icon-180.png"
 ];
-
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting())
-  );
+self.addEventListener("install", e=>{
+  e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting()));
 });
-
-self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.map((k) => (k === CACHE_NAME ? null : caches.delete(k))))
-    ).then(() => self.clients.claim())
-  );
+self.addEventListener("activate", e=>{
+  e.waitUntil(caches.keys().then(keys=>Promise.all(keys.map(k=>k===CACHE_NAME?null:caches.delete(k)))).then(()=>self.clients.claim()));
 });
-
-self.addEventListener("fetch", (event) => {
-  const req = event.request;
-  if (req.method !== "GET") return;
-  event.respondWith(
-    caches.match(req).then((cached) => cached || fetch(req).then((res) => {
-      const copy = res.clone();
-      caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
-      return res;
-    }).catch(() => cached))
-  );
+self.addEventListener("fetch", e=>{
+  if (e.request.method!=="GET") return;
+  e.respondWith(caches.match(e.request).then(cached=>cached || fetch(e.request).then(res=>{
+    const copy=res.clone();
+    caches.open(CACHE_NAME).then(c=>c.put(e.request, copy));
+    return res;
+  })));
 });

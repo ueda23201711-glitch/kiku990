@@ -2,9 +2,10 @@
   "name": "キクタンTOEIC990",
   "short_name": "TOEIC990",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#8A0E4B",
-  "theme_color": "#8A0E4B",
+  "background_color": "#802028",
+  "theme_color": "#802028",
   "icons": [
     {
       "src": "./icons/toeic990-192.png",

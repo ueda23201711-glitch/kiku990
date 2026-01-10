@@ -2277,27 +2277,30 @@ function togglePause() {
     }
 }
 
+
+function isTextSelectableTarget(target){
+  return !!(target && (target.closest && (target.closest('.word-text') || target.closest('.meaning-text') || target.closest('#txt-word') || target.closest('#txt-meaning'))));
+}
+
 /* ===== Swipe (tap -> replay audio) ===== */
 function setupSwipeHandlers() {
     const card = document.getElementById('card-area');
 
     card.addEventListener('touchstart', (e) => {
-        if (e.target.closest('.note-area')) return;
-        if (e.target.closest('#txt-word') || e.target.closest('#txt-meaning')) return;
+        if (e.target.closest('.note-area') || isTextSelectableTarget(e.target)) return;
         touchStartPos.x = e.touches[0].clientX;
         touchStartPos.y = e.touches[0].clientY;
     }, {passive:true});
 
     card.addEventListener('touchend', (e) => {
-        if (e.target.closest('.note-area')) return;
-        if (e.target.closest('#txt-word') || e.target.closest('#txt-meaning')) return;
+        if (e.target.closest('.note-area') || isTextSelectableTarget(e.target)) return;
         touchEndPos.x = e.changedTouches[0].clientX;
         touchEndPos.y = e.changedTouches[0].clientY;
         handleSwipe();
     }, {passive:true});
 
     card.addEventListener('click', (e) => {
-        if (e.target.closest('button') || e.target.closest('.note-area') || e.target.closest('textarea') || e.target.closest('#txt-word') || e.target.closest('#txt-meaning')) return;
+        if (e.target.closest('button') || e.target.closest('.note-area') || e.target.closest('textarea') || isTextSelectableTarget(e.target)) return;
         playWord(e);
     });
 }
