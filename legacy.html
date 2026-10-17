@@ -1890,8 +1890,22 @@ function syncFetchInk(n) {
     }
   });
 }
+// しばらく別のアプリにいたあと戻ってきたら、最初の画面なら最新版に読み直す
+// （ホーム画面のアプリは閉じない限り古い版のまま動き続けるため）
+var hiddenAt = 0;
 document.addEventListener('visibilitychange', function () {
-  if (document.hidden) syncFlush();else syncPull();
+  if (document.hidden) {
+    hiddenAt = Date.now();
+    syncFlush();
+    return;
+  }
+  var away = hiddenAt ? Date.now() - hiddenAt : 0;
+  var onSetup = document.getElementById('screen-setup').classList.contains('active');
+  if (away > 10 * 60 * 1000 && onSetup && !isDrawing) {
+    location.reload();
+    return;
+  } // 未送信の記録は端末に残り、読み直し後に送られる
+  syncPull();
 });
 setInterval(function () {
   if (!document.hidden) syncPull();
