@@ -1643,10 +1643,19 @@ function syncMark(type, n) {
   syncSave();
   syncSchedule(1500);
 }
+var syncDue = 0;
+// すでに早い送信が予定されていれば、それを遅らせない
 function syncSchedule(ms) {
   if (!cloudKey()) return;
+  var due = Date.now() + ms;
+  if (syncTimer && syncDue && syncDue <= due) return;
   clearTimeout(syncTimer);
-  syncTimer = setTimeout(syncFlush, ms);
+  syncDue = due;
+  syncTimer = setTimeout(function () {
+    syncTimer = null;
+    syncDue = 0;
+    syncFlush();
+  }, ms);
 }
 function syncPayload(type, n, t) {
   if (type === 'st') {
