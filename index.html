@@ -1089,6 +1089,7 @@ function updateMasterData() {
    手書きメモと同じ合言葉・同じ場所（memos/合言葉/kiku）を使う。
    合言葉は手書きメモと同じ localStorage のキー（memo_key）に置くので、同じブラウザなら共有される。 */
 const CLOUD_DB = 'https://kiku990-a838d-default-rtdb.asia-southeast1.firebasedatabase.app';
+const CLOUD_NODE = 'kiku';   // 単語帳ごとの保存場所（memos/合言葉/この名前）
 function cloudKey() { try { return localStorage.getItem('memo_key') || ''; } catch (e) { return ''; } }
 function setCloudKey(key) { try { localStorage.setItem('memo_key', key); } catch (e) {} }
 function cloudNormKey(s) {
@@ -1150,7 +1151,7 @@ function cloudPush(cb) {
     const key = cloudKey();
     if (!key) { if (cb) cb({ status: -1 }); return; }
     const t = Date.now();
-    cloudReq('PATCH', '/memos/' + key + '/kiku', { words: masterTsv.trim(), updated: t }, function (err) {
+    cloudReq('PATCH', '/memos/' + key + '/' + CLOUD_NODE, { words: masterTsv.trim(), updated: t }, function (err) {
         if (!err) lsSet('cloud_updated', String(t));
         if (cb) cb(err);
     });
@@ -1168,12 +1169,12 @@ function cloudPull(manual) {
     renderCloudPanel();
     if (manual) cloudSetMsg('読み込み中…', true);
     // 理解度や手書きまで一緒に読まないよう、単語リストの更新日時だけ先に確認する
-    cloudReq('GET', '/memos/' + key + '/kiku/updated', undefined, function (err, updated) {
+    cloudReq('GET', '/memos/' + key + '/' + CLOUD_NODE + '/updated', undefined, function (err, updated) {
         if (err) { cloudPullDone(err, null, manual); return; }
         if (!updated) { cloudPullDone(null, null, manual); return; }
         const localUpdated = Number(lsGet('cloud_updated') || 0);
         if (!manual && cloudWordCount() && updated <= localUpdated) { cloudPullDone(null, { words: masterTsv, updated: updated, same: true }, manual); return; }
-        cloudReq('GET', '/memos/' + key + '/kiku/words', undefined, function (e2, w) {
+        cloudReq('GET', '/memos/' + key + '/' + CLOUD_NODE + '/words', undefined, function (e2, w) {
             cloudPullDone(e2, w ? { words: w, updated: updated } : null, manual);
         });
     });
@@ -1294,7 +1295,7 @@ function cloudStartScan() {
         if (window.BarcodeDetector) { try { cloudScan.detector = new window.BarcodeDetector({ formats: ['qr_code'] }); } catch (e) { cloudScan.detector = null; } }
         if (cloudScan.detector || window.jsQR) { cloudScanLoop(); return; }
         const sc = document.createElement('script');
-        sc.src = 'memo/vendor/jsQR.js';
+        sc.src = '/kiku990/memo/vendor/jsQR.js';
         sc.onload = sc.onerror = () => cloudScanLoop();
         document.head.appendChild(sc);
     }, e => {
@@ -1357,7 +1358,7 @@ function syncFlush() {
         if (size > 1500000) break;   // 手書きが多いときは分けて送る
     }
     syncBusy = true;
-    cloudReq('PATCH', '/memos/' + key + '/kiku', body, function (err) {
+    cloudReq('PATCH', '/memos/' + key + '/' + CLOUD_NODE, body, function (err) {
         syncBusy = false;
         if (err) { syncSchedule(20000); return; }
         Object.keys(sent).forEach(id => { if (syncDirty[id] === sent[id]) delete syncDirty[id]; });
@@ -1379,7 +1380,7 @@ function syncPull(done) {
     syncPulling = true;
     const srv = {}; let pending = 4;
     ['st', 'tx', 'inkT', 'pos'].forEach(name => {
-        cloudReq('GET', '/memos/' + key + '/kiku/' + name, undefined, function (err, data) {
+        cloudReq('GET', '/memos/' + key + '/' + CLOUD_NODE + '/' + name, undefined, function (err, data) {
             srv[name] = err ? null : (data || {});
             if (--pending === 0) { syncPulling = false; syncMerge(srv); if (done) done(true); }
         });
@@ -1474,7 +1475,7 @@ function resumeStudy() {
 function syncFetchInk(n) {
     const key = cloudKey();
     if (!key) return;
-    cloudReq('GET', '/memos/' + key + '/kiku/ink/' + n, undefined, function (err, v) {
+    cloudReq('GET', '/memos/' + key + '/' + CLOUD_NODE + '/ink/' + n, undefined, function (err, v) {
         if (err || !v) return;
         if (syncDirty['ink/' + n] || isDrawing) return;   // 書いている途中なら上書きしない
         try { if (v.v) localStorage.setItem(memoInkKey(n), v.v); else localStorage.removeItem(memoInkKey(n)); } catch (e) { return; }

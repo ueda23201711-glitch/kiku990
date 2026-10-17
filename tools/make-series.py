@@ -1,0 +1,131 @@
+#!/usr/bin/env python3
+"""
+kiku990 の index.html をひな形にして、ほかの単語帳（kiku6000 / kiku12000 / kiku800）を作るスクリプト。
+
+使い方:
+    python3 tools/make-series.py <単語帳の名前> <出力先のリポジトリのフォルダ> [単語データ(TSV)のファイル]
+
+  例: python3 tools/make-series.py kiku6000 ../kiku6000
+
+  - index.html / sw.js / ipad.html / tools/build-legacy.js を出力先に書き出す
+  - 単語データのファイルを指定したときだけ、単語リストをページに埋め込む（ふだんはクラウドから読む）
+  - legacy.html（iPad 2/3 用）は、出力先で node tools/build-legacy.js を実行して作る
+"""
+import json
+import os
+import re
+import shutil
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
+
+SERIES = {
+    'kiku6000': {
+        'title': 'キクタンAdvanced6000', 'short': 'Advanced6000', 'color': '#772F7D',
+        'prefix': 'kikutan_advanced6000__', 'node': 'kiku6000', 'cache': 'kikutan-advanced6000',
+    },
+    'kiku12000': {
+        'title': 'キクタンSuper12000', 'short': 'Super12000', 'color': '#356EA6',
+        'prefix': 'kikutan_super12000__', 'node': 'kiku12000', 'cache': 'kikutan-super12000',
+    },
+    'kiku800': {
+        'title': 'キクタンTOEIC800', 'short': 'TOEIC800', 'color': '#407C42',
+        'prefix': 'kikutan_toeic800_', 'node': 'kiku800', 'cache': 'kikutan-toeic800',
+        # kiku800 は以前、別の名前で「移行済み」の印を付けていた
+        'marker': 'migrated_from_legacy',
+    },
+}
+
+SW_VERSION = 'v10'
+
+
+def must_replace(s, old, new, label, count=None):
+    n = s.count(old)
+    if n == 0 or (count is not None and n != count):
+        raise SystemExit(f'置換対象が見つかりません（{label}）: {n} 件')
+    return s.replace(old, new)
+
+
+def make_index(cfg, data):
+    s = open(os.path.join(ROOT, 'index.html'), encoding='utf-8').read()
+    s = must_replace(s, 'キクタンTOEIC990', cfg['title'], 'title')
+    s = must_replace(s, '（TOEIC990）', '（' + cfg['short'] + '）', 'short title', 1)
+    s = re.sub('#802028', cfg['color'], s, flags=re.I)
+    s = must_replace(s, 'const APP_PREFIX = "kikutan_toeic990__";', f'const APP_PREFIX = "{cfg["prefix"]}";', 'prefix', 1)
+    s = must_replace(s, "const CLOUD_NODE = 'kiku';", f"const CLOUD_NODE = '{cfg['node']}';", 'node', 1)
+    if cfg.get('marker'):
+        s = must_replace(s, 'const marker = k("__migrated_v1");', f'const marker = k("{cfg["marker"]}");', 'marker', 1)
+    if data is not None:
+        if '`' in data or '${' in data:
+            raise SystemExit('単語データに ` または ${ が含まれています')
+        s = must_replace(s, "let masterTsv = '';", 'let masterTsv = `' + data + '`;', 'masterTsv', 1)
+    return s
+
+
+def make_sw(cfg, repo):
+    assets = ['./', './index.html', './manifest.webmanifest']
+    for f in ['apple-touch-icon-180.png', 'favicon-32.png', 'favicon-16.png']:
+        if os.path.exists(os.path.join(repo, 'icons', f)):
+            assets.append('./icons/' + f)
+    return f'''const CACHE_NAME = "{cfg['cache']}-{SW_VERSION}";
+const ASSETS = {json.dumps(assets, indent=2)};
+
+self.addEventListener("install", (event) => {{
+  self.skipWaiting();
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)));
+}});
+
+self.addEventListener("activate", (event) => {{
+  event.waitUntil(
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim())
+  );
+}});
+
+self.addEventListener("fetch", (event) => {{
+  const req = event.request;
+  if (req.method !== "GET") return;
+  // 別サイト（Firebase など）への通信には関与しない
+  if (new URL(req.url).origin !== self.location.origin) return;
+
+  // ページ本体はネット優先（更新がすぐ届くように）。オフライン時はキャッシュ。
+  if (req.mode === "navigate") {{
+    event.respondWith(
+      fetch(req)
+        .then((res) => {{
+          const copy = res.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+          return res;
+        }})
+        .catch(() => caches.match(req).then((c) => c || caches.match("./index.html")))
+    );
+    return;
+  }}
+
+  // アイコン等はキャッシュ優先
+  event.respondWith(caches.match(req).then((cached) => cached || fetch(req)));
+}});
+'''
+
+
+def main():
+    if len(sys.argv) < 3 or sys.argv[1] not in SERIES:
+        raise SystemExit(__doc__)
+    name, repo = sys.argv[1], os.path.abspath(sys.argv[2])
+    data = open(sys.argv[3], encoding='utf-8').read().strip('\n') if len(sys.argv) > 3 else None
+    cfg = SERIES[name]
+    open(os.path.join(repo, 'index.html'), 'w', encoding='utf-8').write(make_index(cfg, data))
+    open(os.path.join(repo, 'sw.js'), 'w', encoding='utf-8').write(make_sw(cfg, repo))
+    ipad = open(os.path.join(ROOT, 'ipad.html'), encoding='utf-8').read().replace('キクタンTOEIC990', cfg['title'])
+    ipad = re.sub('#802028', cfg['color'], ipad, flags=re.I)
+    open(os.path.join(repo, 'ipad.html'), 'w', encoding='utf-8').write(ipad)
+    os.makedirs(os.path.join(repo, 'tools'), exist_ok=True)
+    shutil.copy(os.path.join(HERE, 'build-legacy.js'), os.path.join(repo, 'tools', 'build-legacy.js'))
+    print(f'{name}: index.html / sw.js / ipad.html / tools/build-legacy.js を書き出しました'
+          + ('（単語データ埋め込み）' if data is not None else ''))
+
+
+if __name__ == '__main__':
+    main()
