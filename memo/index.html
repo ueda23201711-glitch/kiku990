@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="手書きメモ">
+<meta name="theme-color" content="#2f4858">
+<title>手書きメモ</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-v2-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon-v2-180.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon-v2-180.png">
+<link rel="apple-touch-icon" sizes="167x167" href="icons/apple-touch-icon-v2-167.png">
+<link rel="apple-touch-icon" sizes="152x152" href="icons/apple-touch-icon-v2-152.png">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<!--
+  手書きメモ（端末間で共有）
+  ・iOS 9 の Safari（iPad 2/3）でも動くよう、JavaScript は ES5 だけで書いています（変換不要）。
+  ・保存先は Firebase Realtime Database（REST API）。合言葉（同期キー）ごとにデータが分かれます。
+-->
+<style>
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: #e9edf0; color: #1f2a30;
+    font-family: -apple-system, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Segoe UI", sans-serif;
+    font-size: 15px; -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: rgba(0,0,0,0);
+    touch-action: manipulation;
+  }
+  button, input, select { font: inherit; color: inherit; }
+  button {
+    border: 0; border-radius: 9px; background: #dfe5e9; padding: 8px 12px; cursor: pointer;
+    -webkit-appearance: none; font-weight: 600;
+  }
+  button:active { opacity: .7; }
+  button.primary { background: #2f4858; color: #fff; }
+  button.danger { background: #fbe3df; color: #a3301f; }
+  .hidden { display: none !important; }
+  .screen { position: absolute; top: 0; left: 0; right: 0; bottom: 0; }
+
+  /* ---- 上部バー ---- */
+  .bar {
+    position: absolute; top: 0; left: 0; right: 0; height: 52px;
+    background: #2f4858; color: #fff;
+    display: -webkit-box; display: -webkit-flex; display: flex;
+    -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+    padding: 0 10px; box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px); height: calc(52px + env(safe-area-inset-top, 0px));
+  }
+  .bar h1 { font-size: 18px; margin: 0; -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; font-weight: 700; }
+  .bar button { background: rgba(255,255,255,.16); color: #fff; margin-left: 8px; }
+  .bar button:first-child { margin-left: 0; }
+  .sync { font-size: 12px; margin-left: 10px; white-space: nowrap; opacity: .9; }
+  .sync.err { color: #ffd2c8; opacity: 1; }
+  .body {
+    position: absolute; left: 0; right: 0; bottom: 0; top: 52px; top: calc(52px + env(safe-area-inset-top, 0px));
+    overflow-y: auto; -webkit-overflow-scrolling: touch;
+  }
+
+  /* ---- 一覧 ---- */
+  .list { padding: 14px; }
+  .grid { margin: 0 -6px; }
+  .grid:after { content: ""; display: table; clear: both; }
+  .card {
+    float: left; width: 50%; padding: 6px; box-sizing: border-box;
+  }
+  @media (min-width: 600px) { .card { width: 33.333%; } }
+  @media (min-width: 900px) { .card { width: 25%; } }
+  .card-in {
+    background: #fff; border-radius: 12px; overflow: hidden; cursor: pointer;
+    box-shadow: 0 1px 3px rgba(31,42,48,.12);
+  }
+  .thumb { display: block; width: 100%; height: 0; padding-bottom: 141.4%; position: relative; background: #fff; border-bottom: 1px solid #eef1f3; }
+  .thumb img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+  .meta { padding: 8px 10px 10px; }
+  .meta b { display: block; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .meta span { font-size: 12px; color: #6b7a83; }
+  .empty { text-align: center; color: #6b7a83; padding: 60px 20px; line-height: 1.8; }
+
+  /* ---- 設定・初回 ---- */
+  .panel { background: #fff; border-radius: 14px; padding: 18px; margin: 14px; max-width: 560px; }
+  @media (min-width: 600px) { .panel { margin: 24px auto; } }
+  .panel h2 { font-size: 17px; margin: 0 0 8px; }
+  .panel p { margin: 0 0 12px; line-height: 1.7; color: #3b4a52; }
+  .key {
+    font-family: Menlo, "Courier New", monospace; font-size: 17px; letter-spacing: .5px;
+    background: #f1f4f6; border-radius: 9px; padding: 12px; word-break: break-all; margin-bottom: 10px;
+    -webkit-user-select: text; user-select: text;
+  }
+  .panel input[type=text] {
+    width: 100%; box-sizing: border-box; padding: 11px; border: 1px solid #c9d2d8; border-radius: 9px;
+    font-family: Menlo, "Courier New", monospace; font-size: 16px; margin-bottom: 10px; background: #fff;
+  }
+  .row { margin-top: 6px; }
+  .row button { margin-right: 8px; margin-bottom: 8px; }
+  .note { font-size: 13px; color: #6b7a83; line-height: 1.7; }
+  .msg { font-size: 13px; color: #a3301f; min-height: 1em; margin-bottom: 6px; }
+  .msg.ok { color: #2d6a4f; }
+  .or { font-size: 13px; color: #6b7a83; margin: 14px 0 8px; }
+  .code-in { text-transform: uppercase; letter-spacing: 3px; text-align: center; font-size: 22px !important; }
+  .qr { text-align: center; margin: 4px 0 10px; }
+  .qr img { width: 220px; height: 220px; image-rendering: pixelated; image-rendering: -webkit-optimize-contrast; background: #fff; }
+  .codebox { text-align: center; margin: 10px 0; }
+  .codebox b { display: block; font-family: Menlo, "Courier New", monospace; font-size: 40px; letter-spacing: 6px; color: #2f4858; }
+  .codebox span { font-size: 13px; color: #6b7a83; }
+  details summary { cursor: pointer; color: #2f4858; font-size: 14px; margin-top: 12px; }
+  details[open] summary { margin-bottom: 10px; }
+  #scanner { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #000; z-index: 50; }
+  #scanner video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+  #scanner .frame { position: absolute; left: 50%; top: 45%; width: 240px; height: 240px; margin: -120px 0 0 -120px; border: 3px solid rgba(255,255,255,.9); border-radius: 18px; box-shadow: 0 0 0 2000px rgba(0,0,0,.45); }
+  #scanner .scan-ui { position: absolute; left: 0; right: 0; bottom: 0; padding: 20px 20px 34px; text-align: center; color: #fff; }
+  #scanner .scan-ui p { margin: 0 0 14px; line-height: 1.6; }
+  #scanner .scan-ui button { background: #fff; color: #1f2a30; padding: 12px 28px; }
+
+  /* ---- 編集 ---- */
+  .tools {
+    position: absolute; left: 0; right: 0; top: 52px; top: calc(52px + env(safe-area-inset-top, 0px));
+    background: #f7f9fa; border-bottom: 1px solid #d7dee3; padding: 6px 8px; box-sizing: border-box;
+  }
+  .tools button { padding: 7px 10px; margin: 2px 4px 2px 0; background: #e6ebee; vertical-align: middle; }
+  .tools button.on { background: #2f4858; color: #fff; }
+  .tools .sep { display: inline-block; width: 1px; height: 24px; background: #d0d8dd; margin: 0 6px 0 2px; vertical-align: middle; }
+  .dot { display: inline-block; width: 16px; height: 16px; border-radius: 50%; vertical-align: -3px; border: 2px solid rgba(0,0,0,.1); }
+  .title-in {
+    -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; min-width: 0; margin: 0 8px;
+    background: rgba(255,255,255,.14); border: 0; border-radius: 8px; color: #fff; padding: 8px 10px; font-weight: 600;
+  }
+  .stage { position: absolute; left: 0; right: 0; bottom: 0; overflow: hidden; background: #e9edf0; }
+  .page { position: absolute; background: #fff; box-shadow: 0 2px 10px rgba(31,42,48,.18); }
+  .page canvas { position: absolute; top: 0; left: 0; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+</style>
+</head>
+<body>
+
+<!-- 初回：合言葉の設定 -->
+<div id="scr-setup" class="screen hidden">
+  <div class="bar"><h1>手書きメモ</h1></div>
+  <div class="body">
+    <div class="panel">
+      <h2>はじめに</h2>
+      <p>同じ「合言葉」を入れた端末どうしで、メモが共有されます。</p>
+      <button class="primary" id="btn-new-key" type="button">この端末で新しく始める</button>
+    </div>
+    <div class="panel">
+      <h2>ほかの端末ですでに使っている場合</h2>
+      <p>使っている端末で「設定」→「ほかの端末を追加」を開いてください。</p>
+      <div class="scan-only hidden">
+        <button class="primary" data-scan="setup" type="button">QRコードを読み取る</button>
+        <div class="or">または、表示されたペアリングコード（8文字）を入力：</div>
+      </div>
+      <div class="noscan-only">ペアリングコード（8文字）を入力：</div>
+      <input type="text" class="code-in" id="inp-code-setup" maxlength="9" autocapitalize="characters" autocorrect="off" autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX">
+      <div class="msg" id="setup-msg"></div>
+      <button class="primary" data-code="setup" type="button">コードで設定する</button>
+      <details>
+        <summary>合言葉（32文字）を直接入力する</summary>
+        <input type="text" id="inp-key" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="xxxx-xxxx-xxxx-xxxx-xxxx-xxxx-xxxx-xxxx">
+        <button id="btn-use-key" type="button">この合言葉を使う</button>
+      </details>
+    </div>
+  </div>
+</div>
+
+<!-- 一覧 -->
+<div id="scr-list" class="screen hidden">
+  <div class="bar">
+    <h1>手書きメモ</h1>
+    <span class="sync" id="sync-list"></span>
+    <button id="btn-refresh" type="button" title="最新を読み込む">↻</button>
+    <button id="btn-settings" type="button">設定</button>
+    <button id="btn-add" type="button">＋ 新規</button>
+  </div>
+  <div class="body">
+    <div class="list">
+      <div class="grid" id="grid"></div>
+      <div class="empty hidden" id="empty">メモはまだありません。<br>右上の「＋ 新規」から書き始めましょう。</div>
+    </div>
+  </div>
+</div>
+
+<!-- 設定 -->
+<div id="scr-settings" class="screen hidden">
+  <div class="bar">
+    <button id="btn-settings-back" type="button">← 戻る</button>
+    <h1 style="margin-left:10px">設定</h1>
+  </div>
+  <div class="body">
+    <div class="panel">
+      <h2>ほかの端末を追加</h2>
+      <p>追加する端末で手書きメモを開き、「QRコードを読み取る」でこのQRを読み取ってください。AndroidやiPhoneのカメラで読み取っても設定できます。</p>
+      <div class="qr"><img id="qr-img" alt="合言葉のQRコード"></div>
+      <p>カメラが使えない端末（iPad 2/3 など）には、ペアリングコードを入力してください。</p>
+      <button class="primary" id="btn-pair" type="button">ペアリングコードを表示</button>
+      <div class="codebox hidden" id="pair-box"><b id="pair-code"></b><span id="pair-left"></span></div>
+      <div class="msg" id="pair-msg"></div>
+    </div>
+    <div class="panel">
+      <h2>この端末の合言葉</h2>
+      <p>ほかの端末でこの合言葉を入力すると、同じメモが見られます。</p>
+      <div class="key" id="key-show"></div>
+      <div class="row">
+        <button id="btn-copy-key" type="button">コピー</button>
+        <span class="note" id="copy-msg"></span>
+      </div>
+      <p class="note">合言葉を知っている人はメモを読み書きできます。人に教えないでください。パスワードなど大事な情報はメモに書かないでください。</p>
+    </div>
+    <div class="panel">
+      <h2>合言葉を変える</h2>
+      <p>ほかの端末と同じ合言葉に切り替えます。この端末でまだ送信していないメモは失われます。</p>
+      <div class="scan-only hidden">
+        <button data-scan="settings" type="button">QRコードを読み取る</button>
+        <div class="or">または、ペアリングコード（8文字）を入力：</div>
+      </div>
+      <div class="noscan-only">ペアリングコード（8文字）を入力：</div>
+      <input type="text" class="code-in" id="inp-code-settings" maxlength="9" autocapitalize="characters" autocorrect="off" autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX">
+      <div class="msg" id="settings-msg"></div>
+      <button data-code="settings" type="button">コードで切り替える</button>
+      <details>
+        <summary>合言葉（32文字）を直接入力する</summary>
+        <input type="text" id="inp-key2" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="xxxx-xxxx-…">
+        <button id="btn-change-key" type="button">切り替える</button>
+      </details>
+    </div>
+  </div>
+</div>
+
+<!-- 編集 -->
+<div id="scr-edit" class="screen hidden">
+  <div class="bar">
+    <button id="btn-back" type="button">← 一覧</button>
+    <input class="title-in" id="inp-title" type="text" maxlength="40">
+    <span class="sync" id="sync-edit"></span>
+  </div>
+  <div class="tools" id="tools">
+    <button data-tool="pen" data-color="#1f2a30" type="button"><span class="dot" style="background:#1f2a30"></span></button>
+    <button data-tool="pen" data-color="#d23b2a" type="button"><span class="dot" style="background:#d23b2a"></span></button>
+    <button data-tool="pen" data-color="#2463c9" type="button"><span class="dot" style="background:#2463c9"></span></button>
+    <button data-tool="hl" data-color="#ffd43b" type="button">蛍光</button>
+    <button data-tool="eraser" type="button">消しゴム</button>
+    <span class="sep"></span>
+    <button data-size="1" type="button">細</button>
+    <button data-size="2" type="button">中</button>
+    <button data-size="3" type="button">太</button>
+    <span class="sep"></span>
+    <button id="btn-undo" type="button">↶ 戻す</button>
+    <button id="btn-redo" type="button">↷ やり直す</button>
+    <span class="sep"></span>
+    <button id="btn-clear" type="button">全部消す</button>
+    <button id="btn-delete" class="danger" type="button">メモを削除</button>
+  </div>
+  <div class="stage" id="stage">
+    <div class="page" id="page">
+      <canvas id="cv"></canvas>
+      <canvas id="cv-live"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- QR 読み取り -->
+<div id="scanner" class="hidden">
+  <video id="scan-video" playsinline muted autoplay></video>
+  <div class="frame"></div>
+  <div class="scan-ui">
+    <p id="scan-msg">ほかの端末の「設定」に表示されたQRコードを枠に合わせてください</p>
+    <button id="btn-scan-cancel" type="button">やめる</button>
+  </div>
+</div>
+
+<script src="vendor/qrcode.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  /* ===================== 設定 ===================== */
+  var DB_URL = 'https://kiku990-a838d-default-rtdb.asia-southeast1.firebasedatabase.app';
+  var PAGE_W = 1000, PAGE_H = 1414;          // 用紙（A判の縦横比）。座標はこの単位で保存
+  var SIZES = { pen: [3, 6, 11], hl: [22, 34, 48], eraser: [18, 36, 70] };
+  var POLL_MS = 10000;                        // 開いているメモの更新確認の間隔
+
+  /* ===================== 小道具 ===================== */
+  function $(id) { return document.getElementById(id); }
+  function now() { return new Date().getTime(); }
+  function each(list, fn) { for (var i = 0; i < list.length; i++) fn(list[i], i); }
+  function lsGet(k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { window.localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+  function lsDel(k) { try { window.localStorage.removeItem(k); } catch (e) {} }
+  function lsJSON(k, def) { var s = lsGet(k); if (!s) return def; try { return JSON.parse(s); } catch (e) { return def; } }
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+  function fmtDate(t) {
+    var d = new Date(t);
+    return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+  }
+  function newId() {
+    var s = now().toString(36), c = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    for (var i = 0; i < 6; i++) s += c.charAt(Math.floor(Math.random() * c.length));
+    return s;
+  }
+  function show(id) {
+    each(['scr-setup', 'scr-list', 'scr-settings', 'scr-edit'], function (s) {
+      $(s).className = 'screen' + (s === id ? '' : ' hidden');
+    });
+  }
+  function on(el, ev, fn, opt) { el.addEventListener(ev, fn, opt || false); }
+
+  /* ===================== 合言葉 ===================== */
+  var KEY_CHARS = 'abcdefghjkmnpqrstuvwxyz23456789'; // 紛らわしい文字（i,l,o,0,1）を除外
+  function makeKey() {
+    var out = '', bytes = [];
+    if (window.crypto && window.crypto.getRandomValues) {
+      var a = new Uint8Array(32); window.crypto.getRandomValues(a);
+      for (var i = 0; i < 32; i++) bytes.push(a[i]);
+    } else {
+      for (var j = 0; j < 32; j++) bytes.push(Math.floor(Math.random() * 256));
+    }
+    for (var k = 0; k < 32; k++) {
+      if (k && k % 4 === 0) out += '-';
+      out += KEY_CHARS.charAt(bytes[k] % KEY_CHARS.length);
+    }
+    return out;
+  }
+  function normKey(s) {
+    var raw = String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (raw.length !== 32) return null;
+    return raw.replace(/(.{4})(?!$)/g, '$1-');
+  }
+
+  /* ===================== 状態 ===================== */
+  var KEY = lsGet('memo_key');
+  var index = lsJSON('memo_index', {});     // id -> {title, updated, thumb}
+  var dirty = lsJSON('memo_dirty', {});     // id -> true（未送信）/ 'del'（削除未送信）
+  var cur = null;                           // 開いているメモ
+  var curIsNew = false;                     // 新規作成してまだ何も保存していない
+  var redoStack = [];
+  var tool = 'pen', color = '#1f2a30', sizeLv = 1;
+
+  function saveIndexLocal() { lsSet('memo_index', JSON.stringify(index)); }
+  function saveDirtyLocal() { lsSet('memo_dirty', JSON.stringify(dirty)); }
+  function noteKey(id) { return 'memo_note_' + id; }
+  function cacheNote(n) {
+    if (lsSet(noteKey(n.id), JSON.stringify(n))) return;
+    // 容量不足：送信済みのメモのキャッシュから捨てる
+    for (var id in index) { if (!dirty[id] && id !== n.id) lsDel(noteKey(id)); }
+    lsSet(noteKey(n.id), JSON.stringify(n));
+  }
+
+  /* ===================== 通信（Firebase REST） ===================== */
+  function api(method, path, body, cb) { rawApi(method, '/memos/' + KEY + path, body, cb); }
+  function rawApi(method, path, body, cb) {
+    var x = new XMLHttpRequest();
+    x.open(method, DB_URL + path + '.json', true);
+    x.timeout = 20000;
+    x.onreadystatechange = function () {
+      if (x.readyState !== 4) return;
+      if (x.status >= 200 && x.status < 300) {
+        var data = null; try { data = JSON.parse(x.responseText); } catch (e) {}
+        cb(null, data);
+      } else {
+        cb({ status: x.status, text: x.responseText || '' });
+      }
+    };
+    x.ontimeout = function () { /* onreadystatechange で status 0 として処理される */ };
+    if (body !== undefined) { x.setRequestHeader('Content-Type', 'application/json'); x.send(JSON.stringify(body)); }
+    else x.send();
+  }
+  function errText(err) {
+    if (!err) return '';
+    if (err.status === 0) return '接続できません';
+    if (err.status === 401 || err.status === 403) return '権限エラー';
+    return 'エラー ' + err.status;
+  }
+
+  var syncState = { text: '', err: false };
+  function setSync(text, err) {
+    syncState.text = text; syncState.err = !!err;
+    each([$('sync-list'), $('sync-edit')], function (el) {
+      el.textContent = text; el.className = 'sync' + (err ? ' err' : '');
+    });
+  }
+  function dirtyCount() { var n = 0; for (var k in dirty) n++; return n; }
+
+  /* 未送信分をまとめて送る */
+  var flushTimer = null, flushing = false, retryTimer = null;
+  function scheduleFlush(ms) {
+    if (flushTimer) clearTimeout(flushTimer);
+    flushTimer = setTimeout(flush, ms === undefined ? 1200 : ms);
+  }
+  function flush() {
+    flushTimer = null;
+    if (flushing || !KEY) return;
+    var ids = []; for (var id in dirty) ids.push(id);
+    if (!ids.length) { setSync('保存済み'); return; }
+    var body = {};
+    each(ids, function (id) {
+      if (dirty[id] === 'del') { body['notes/' + id] = null; body['index/' + id] = null; return; }
+      var n = (cur && cur.id === id) ? cur : lsJSON(noteKey(id), null);
+      if (!n) { delete dirty[id]; return; }
+      body['notes/' + id] = n;
+      body['index/' + id] = index[id] || { title: n.title, updated: n.updated };
+    });
+    flushing = true;
+    setSync('保存中…');
+    var sentVersions = {};
+    each(ids, function (id) { sentVersions[id] = index[id] ? index[id].updated : 0; });
+    api('PATCH', '', body, function (err) {
+      flushing = false;
+      if (err) {
+        setSync('未送信 ' + dirtyCount() + '件（' + errText(err) + '）', true);
+        if (retryTimer) clearTimeout(retryTimer);
+        retryTimer = setTimeout(flush, 15000);
+        return;
+      }
+      // 送信中にさらに書き足されたものは dirty のまま残す
+      each(ids, function (id) {
+        var v = index[id] ? index[id].updated : 0;
+        if (dirty[id] === 'del' || v === sentVersions[id]) delete dirty[id];
+      });
+      saveDirtyLocal();
+      if (dirtyCount()) scheduleFlush(300); else setSync('保存済み');
+    });
+  }
+
+  /* ===================== 一覧 ===================== */
+  function renderList() {
+    var ids = [];
+    for (var id in index) if (dirty[id] !== 'del') ids.push(id);
+    ids.sort(function (a, b) { return (index[b].updated || 0) - (index[a].updated || 0); });
+    var g = $('grid');
+    g.innerHTML = '';
+    $('empty').className = 'empty' + (ids.length ? ' hidden' : '');
+    each(ids, function (id) {
+      var it = index[id];
+      var card = document.createElement('div'); card.className = 'card';
+      var inner = document.createElement('div'); inner.className = 'card-in';
+      var th = document.createElement('div'); th.className = 'thumb';
+      if (it.thumb) { var img = document.createElement('img'); img.src = it.thumb; img.alt = ''; th.appendChild(img); }
+      var meta = document.createElement('div'); meta.className = 'meta';
+      var b = document.createElement('b'); b.textContent = it.title || '（無題）';
+      var sp = document.createElement('span'); sp.textContent = fmtDate(it.updated || 0) + (dirty[id] ? ' ・未送信' : '');
+      meta.appendChild(b); meta.appendChild(sp);
+      inner.appendChild(th); inner.appendChild(meta); card.appendChild(inner);
+      on(inner, 'click', function () { openNote(id); });
+      g.appendChild(card);
+    });
+  }
+
+  function refreshIndex() {
+    if (!KEY) return;
+    setSync(dirtyCount() ? '保存中…' : '読み込み中…');
+    api('GET', '/index', undefined, function (err, data) {
+      if (err) { setSync('オフライン（' + errText(err) + '）', true); return; }
+      data = data || {};
+      var id;
+      // サーバー側の新しいものを取り込む（未送信の手元の変更は優先）
+      for (id in data) {
+        if (dirty[id]) continue;
+        if (!index[id] || (data[id].updated || 0) > (index[id].updated || 0)) {
+          index[id] = data[id];
+          lsDel(noteKey(id)); // 本文は開いたときに取り直す
+        }
+      }
+      // 他の端末で削除されたもの
+      for (id in index) { if (!data[id] && !dirty[id]) { delete index[id]; lsDel(noteKey(id)); } }
+      saveIndexLocal();
+      if (!$('scr-list').className.match(/hidden/)) renderList();
+      if (dirtyCount()) scheduleFlush(0); else setSync('最新');
+    });
+  }
+
+  /* ===================== 描画 ===================== */
+  var cv = $('cv'), cvLive = $('cv-live'), ctx = cv.getContext('2d'), lctx = cvLive.getContext('2d');
+  var scale = 1, dpr = window.devicePixelRatio || 1;
+
+  function layout() {
+    var stage = $('stage'), tools = $('tools');
+    var top = tools.offsetTop + tools.offsetHeight;
+    stage.style.top = top + 'px';
+    var W = stage.clientWidth - 16, H = stage.clientHeight - 16;
+    if (W < 50 || H < 50) return;
+    scale = Math.min(W / PAGE_W, H / PAGE_H);
+    var w = Math.floor(PAGE_W * scale), h = Math.floor(PAGE_H * scale);
+    var page = $('page');
+    page.style.width = w + 'px'; page.style.height = h + 'px';
+    page.style.left = Math.floor((stage.clientWidth - w) / 2) + 'px';
+    page.style.top = Math.floor((stage.clientHeight - h) / 2) + 'px';
+    each([cv, cvLive], function (c) {
+      c.style.width = w + 'px'; c.style.height = h + 'px';
+      c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
+    });
+    redraw();
+  }
+
+  function strokeStyle(c, st, s) {
+    var k = s * dpr;
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    c.lineWidth = Math.max(1, st.w * k);
+    if (st.t === 'eraser') { c.globalCompositeOperation = 'destination-out'; c.strokeStyle = '#000'; c.fillStyle = '#000'; c.globalAlpha = 1; }
+    else {
+      c.globalCompositeOperation = st.t === 'hl' ? 'multiply' : 'source-over';
+      c.strokeStyle = st.c; c.fillStyle = st.c; c.globalAlpha = st.t === 'hl' ? 0.45 : 1;
+      if (st.t === 'hl') c.lineCap = 'butt';
+    }
+  }
+  function pathStroke(c, st, s) {
+    var p = st.p, k = s * dpr;
+    if (p.length < 2) return;
+    strokeStyle(c, st, s);
+    if (p.length === 2) {
+      c.beginPath(); c.arc(p[0] * k, p[1] * k, c.lineWidth / 2, 0, Math.PI * 2); c.fill();
+    } else {
+      c.beginPath(); c.moveTo(p[0] * k, p[1] * k);
+      for (var i = 2; i < p.length - 2; i += 2) {
+        var mx = (p[i] + p[i + 2]) / 2, my = (p[i + 1] + p[i + 3]) / 2;
+        c.quadraticCurveTo(p[i] * k, p[i + 1] * k, mx * k, my * k);
+      }
+      c.lineTo(p[p.length - 2] * k, p[p.length - 1] * k);
+      c.stroke();
+    }
+    c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
+  }
+  // 「全部消す」は {t:'clear'} の印として記録し、それより前の線は描かない
+  function visible(strokes) {
+    var from = 0;
+    for (var i = (strokes || []).length - 1; i >= 0; i--) { if (strokes[i].t === 'clear') { from = i + 1; break; } }
+    return (strokes || []).slice(from);
+  }
+  function redraw() {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    lctx.clearRect(0, 0, cvLive.width, cvLive.height);
+    if (!cur) return;
+    each(visible(cur.strokes), function (st) { pathStroke(ctx, st, scale); });
+  }
+  function makeThumb(n) {
+    try {
+      var c = document.createElement('canvas'), tw = 200, th = Math.round(200 * PAGE_H / PAGE_W);
+      c.width = tw; c.height = th;
+      var x = c.getContext('2d'), saveDpr = dpr;
+      // 消しゴムが白地まで消さないよう、線だけ別に描いてから白地に重ねる
+      var c2 = document.createElement('canvas'); c2.width = tw; c2.height = th;
+      var x2 = c2.getContext('2d');
+      dpr = 1;
+      each(visible(n.strokes), function (st) { pathStroke(x2, st, tw / PAGE_W); });
+      dpr = saveDpr;
+      x.fillStyle = '#fff'; x.fillRect(0, 0, tw, th); x.drawImage(c2, 0, 0);
+      return c.toDataURL('image/jpeg', 0.6);
+    } catch (e) { dpr = window.devicePixelRatio || 1; return ''; }
+  }
+
+  /* ---- 入力 ---- */
+  var drawing = null;            // {st, id}
+  var penSeen = false;           // Apple Pencil 等を使ったら、指の入力は無視（手のひら対策）
+
+  function toPage(clientX, clientY) {
+    var r = cv.getBoundingClientRect();
+    return [Math.round((clientX - r.left) / scale), Math.round((clientY - r.top) / scale)];
+  }
+  function startStroke(x, y, ptrId) {
+    if (!cur) return;
+    var st = { t: tool, w: SIZES[tool][sizeLv - 1], p: [] };
+    if (tool !== 'eraser') st.c = color;
+    var pt = toPage(x, y); st.p.push(pt[0], pt[1]);
+    drawing = { st: st, id: ptrId };
+    liveDraw();
+  }
+  function moveStroke(x, y) {
+    if (!drawing) return;
+    var pt = toPage(x, y), p = drawing.st.p;
+    var lx = p[p.length - 2], ly = p[p.length - 1];
+    if (Math.abs(pt[0] - lx) + Math.abs(pt[1] - ly) < 2) return;
+    p.push(pt[0], pt[1]);
+    liveDraw();
+  }
+  var liveQueued = false;
+  function liveDraw() {
+    if (liveQueued) return;
+    liveQueued = true;
+    var raf = window.requestAnimationFrame || function (f) { return setTimeout(f, 16); };
+    raf(function () {
+      liveQueued = false;
+      if (!drawing) return;
+      var st = drawing.st;
+      if (st.t === 'eraser') {
+        // 消しゴムは本体に直接（いま引いた区間だけ）
+        var p = st.p, n = p.length;
+        var seg = { t: 'eraser', w: st.w, p: n >= 4 ? p.slice(n - 4) : p.slice(0) };
+        pathStroke(ctx, seg, scale);
+      } else {
+        lctx.clearRect(0, 0, cvLive.width, cvLive.height);
+        pathStroke(lctx, st, scale);
+      }
+    });
+  }
+  function endStroke() {
+    if (!drawing) return;
+    var st = drawing.st; drawing = null;
+    lctx.clearRect(0, 0, cvLive.width, cvLive.height);
+    cur.strokes.push(st);
+    redoStack = [];
+    if (st.t === 'eraser') redraw(); else pathStroke(ctx, st, scale);
+    changed();
+  }
+
+  function findTouch(list, id) { for (var i = 0; i < list.length; i++) if (list[i].identifier === id) return list[i]; return null; }
+
+  if (window.PointerEvent) {
+    on(cvLive, 'pointerdown', function (e) {
+      if (e.pointerType === 'pen') penSeen = true;
+      if (penSeen && e.pointerType === 'touch') return;
+      if (drawing) return;
+      e.preventDefault();
+      try { cvLive.setPointerCapture(e.pointerId); } catch (er) {}
+      startStroke(e.clientX, e.clientY, e.pointerId);
+    });
+    on(cvLive, 'pointermove', function (e) {
+      if (!drawing || e.pointerId !== drawing.id) return;
+      e.preventDefault();
+      var list = e.getCoalescedEvents ? e.getCoalescedEvents() : null;
+      if (list && list.length) each(list, function (ev) { moveStroke(ev.clientX, ev.clientY); });
+      else moveStroke(e.clientX, e.clientY);
+    });
+    var up = function (e) { if (drawing && e.pointerId === drawing.id) endStroke(); };
+    on(cvLive, 'pointerup', up); on(cvLive, 'pointercancel', up);
+  } else {
+    // iOS 9 など：タッチ（最初の1本の指だけ追う。2本目以降＝手のひらは無視）
+    on(cvLive, 'touchstart', function (e) {
+      e.preventDefault();
+      if (drawing) return;
+      var t = e.changedTouches[0];
+      startStroke(t.clientX, t.clientY, t.identifier);
+    });
+    on(cvLive, 'touchmove', function (e) {
+      e.preventDefault();
+      if (!drawing) return;
+      var t = findTouch(e.changedTouches, drawing.id);
+      if (t) moveStroke(t.clientX, t.clientY);
+    });
+    var tend = function (e) { if (drawing && findTouch(e.changedTouches, drawing.id)) endStroke(); };
+    on(cvLive, 'touchend', tend); on(cvLive, 'touchcancel', tend);
+    // マウス（Mac の Safari 等）
+    var mouseDown = false;
+    on(cvLive, 'mousedown', function (e) { mouseDown = true; startStroke(e.clientX, e.clientY, 'm'); });
+    on(window, 'mousemove', function (e) { if (mouseDown) moveStroke(e.clientX, e.clientY); });
+    on(window, 'mouseup', function () { if (mouseDown) { mouseDown = false; endStroke(); } });
+  }
+  // スクロールやズームを止める（iOS 9）
+  on(document, 'touchmove', function (e) { if (e.target === cvLive) e.preventDefault(); });
+
+  /* ===================== メモの開閉・保存 ===================== */
+  function changed() {
+    if (!cur) return;
+    cur.updated = now();
+    index[cur.id] = { title: cur.title, updated: cur.updated, thumb: makeThumb(cur) };
+    dirty[cur.id] = true; curIsNew = false;
+    saveIndexLocal(); saveDirtyLocal(); cacheNote(cur);
+    setSync('保存待ち');
+    scheduleFlush();
+    updateUndoButtons();
+  }
+
+  function openNote(id, isNew) {
+    curIsNew = !!isNew;
+    var local = lsJSON(noteKey(id), null);
+    cur = local || { id: id, title: (index[id] && index[id].title) || '', strokes: [], updated: 0, created: now() };
+    if (!cur.strokes) cur.strokes = [];
+    redoStack = [];
+    $('inp-title').value = cur.title || '';
+    show('scr-edit');
+    layout();
+    updateUndoButtons();
+    if (!isNew) pullCurrent(true);
+    startPoll();
+  }
+  function pullCurrent(force) {
+    if (!cur || dirty[cur.id] || drawing) return;
+    var id = cur.id;
+    var get = function () {
+      api('GET', '/notes/' + id, undefined, function (err, n) {
+        if (err) { setSync('オフライン（' + errText(err) + '）', true); return; }
+        if (!cur || cur.id !== id || dirty[id] || drawing) return;
+        if (!n) return;
+        if (!n.strokes) n.strokes = [];
+        if ((n.updated || 0) > (cur.updated || 0) || force) {
+          n.id = id; cur = n; redoStack = [];
+          $('inp-title').value = cur.title || '';
+          cacheNote(cur); redraw(); updateUndoButtons();
+        }
+        setSync('最新');
+      });
+    };
+    if (force) { get(); return; }
+    // 更新日時だけ先に確認（通信量を減らす）
+    api('GET', '/notes/' + id + '/updated', undefined, function (err, t) {
+      if (err) { setSync('オフライン（' + errText(err) + '）', true); return; }
+      if (cur && cur.id === id && (t || 0) > (cur.updated || 0)) get();
+      else if (!dirtyCount()) setSync('最新');
+    });
+  }
+  var pollTimer = null;
+  function startPoll() { stopPoll(); pollTimer = setInterval(function () { pullCurrent(false); }, POLL_MS); }
+  function stopPoll() { if (pollTimer) clearInterval(pollTimer); pollTimer = null; }
+
+  function closeNote() {
+    stopPoll();
+    if (cur && curIsNew && !dirty[cur.id]) {
+      // 何も書かなかった新規メモは残さない
+      delete index[cur.id]; lsDel(noteKey(cur.id)); saveIndexLocal();
+    }
+    curIsNew = false;
+    cur = null;
+    show('scr-list'); renderList(); refreshIndex();
+  }
+
+  function updateUndoButtons() {
+    $('btn-undo').disabled = !(cur && cur.strokes.length);
+    $('btn-redo').disabled = !redoStack.length;
+    $('btn-undo').style.opacity = $('btn-undo').disabled ? 0.4 : 1;
+    $('btn-redo').style.opacity = $('btn-redo').disabled ? 0.4 : 1;
+  }
+
+  /* ===================== ツールバー ===================== */
+  function syncToolButtons() {
+    each($('tools').getElementsByTagName('button'), function (b) {
+      var t = b.getAttribute('data-tool'), s = b.getAttribute('data-size');
+      var onState = false;
+      if (t) onState = (t === tool) && (t === 'eraser' || b.getAttribute('data-color') === color || t === 'hl');
+      if (s) onState = Number(s) === sizeLv;
+      if (t || s) b.className = onState ? 'on' : '';
+    });
+  }
+  on($('tools'), 'click', function (e) {
+    var b = e.target; while (b && b.tagName !== 'BUTTON') b = b.parentNode;
+    if (!b) return;
+    var t = b.getAttribute('data-tool'), s = b.getAttribute('data-size');
+    if (t) { tool = t; if (b.getAttribute('data-color')) color = b.getAttribute('data-color'); }
+    if (s) sizeLv = Number(s);
+    if (t || s) { syncToolButtons(); lsSet('memo_tool', JSON.stringify({ tool: tool, color: color, size: sizeLv })); }
+  });
+  on($('btn-undo'), 'click', function () {
+    if (!cur || !cur.strokes.length) return;
+    redoStack.push(cur.strokes.pop()); redraw(); changed();
+  });
+  on($('btn-redo'), 'click', function () {
+    if (!redoStack.length) return;
+    cur.strokes.push(redoStack.pop()); redraw(); changed();
+  });
+  on($('btn-clear'), 'click', function () {
+    if (!cur || !visible(cur.strokes).length) return;
+    if (!window.confirm('このメモの手書きを全部消しますか？（「戻す」で元に戻せます）')) return;
+    redoStack = [];
+    cur.strokes.push({ t: 'clear' });
+    redraw(); changed();
+  });
+  on($('btn-delete'), 'click', function () {
+    if (!cur) return;
+    if (!window.confirm('このメモを削除しますか？ほかの端末からも消えます。')) return;
+    var id = cur.id;
+    delete index[id]; lsDel(noteKey(id)); dirty[id] = 'del';
+    saveIndexLocal(); saveDirtyLocal();
+    cur = null; stopPoll();
+    show('scr-list'); renderList(); scheduleFlush(0);
+  });
+  on($('inp-title'), 'change', function () {
+    if (!cur) return;
+    cur.title = $('inp-title').value.replace(/^\s+|\s+$/g, '');
+    changed();
+  });
+  on($('btn-back'), 'click', function () { $('inp-title').blur(); closeNote(); });
+
+  /* ===================== 一覧・設定の操作 ===================== */
+  on($('btn-add'), 'click', function () {
+    var id = newId(), t = now();
+    var n = { id: id, title: fmtDate(t), strokes: [], created: t, updated: t };
+    index[id] = { title: n.title, updated: t, thumb: '' };
+    cacheNote(n);
+    openNote(id, true);
+  });
+  on($('btn-refresh'), 'click', function () { refreshIndex(); });
+  on($('btn-settings'), 'click', function () {
+    $('key-show').textContent = KEY; $('copy-msg').textContent = ''; $('settings-msg').textContent = ''; $('pair-msg').textContent = '';
+    renderQr();
+    show('scr-settings');
+  });
+  on($('btn-settings-back'), 'click', function () { cancelPair(); show('scr-list'); renderList(); });
+  on($('btn-copy-key'), 'click', function () {
+    var done = function (ok) { $('copy-msg').textContent = ok ? 'コピーしました' : '長押しで選択してコピーしてください'; };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(KEY).then(function () { done(true); }, function () { done(false); });
+    } else done(false);
+  });
+  function useKey(k) {
+    cancelPair();
+    KEY = k; lsSet('memo_key', k);
+    index = {}; dirty = {}; saveIndexLocal(); saveDirtyLocal();
+    show('scr-list'); renderList(); refreshIndex();
+  }
+  // ほかの端末から受け取った合言葉を使う（いまの合言葉と違えば確認）
+  function applyKey(k) {
+    if (KEY === k) { show('scr-list'); renderList(); refreshIndex(); return; }
+    if (KEY) {
+      var warn = dirtyCount() ? '\n（この端末でまだ送信していないメモは失われます）' : '';
+      if (!window.confirm('合言葉を切り替えて、ほかの端末と同じメモを表示しますか？' + warn)) return;
+    }
+    useKey(k);
+  }
+  // QR の中身や URL から合言葉を取り出す
+  function keyFromText(t) {
+    t = String(t || '');
+    var m = t.match(/[#&?]k=([A-Za-z0-9-]+)/);
+    return normKey(m ? m[1] : t);
+  }
+
+  /* ---- QR 表示 ---- */
+  function pairUrl() { return location.href.split('#')[0].split('?')[0] + '#k=' + KEY; }
+  function renderQr() {
+    try {
+      var q = qrcode(0, 'M'); q.addData(pairUrl()); q.make();
+      $('qr-img').src = q.createDataURL(6, 4);
+    } catch (e) { $('qr-img').alt = 'QRコードを作れませんでした'; }
+  }
+
+  /* ---- ペアリングコード（5分間だけ有効） ---- */
+  var PAIR_MS = 5 * 60 * 1000;
+  var pair = null; // {code, exp, timer}
+  function makeCode() {
+    var a = [], out = '';
+    if (window.crypto && window.crypto.getRandomValues) { var u = new Uint8Array(8); window.crypto.getRandomValues(u); for (var i = 0; i < 8; i++) a.push(u[i]); }
+    else for (var j = 0; j < 8; j++) a.push(Math.floor(Math.random() * 256));
+    for (var k = 0; k < 8; k++) out += KEY_CHARS.charAt(a[k] % KEY_CHARS.length);
+    return out;
+  }
+  function fmtCode(c) { return (c.slice(0, 4) + '-' + c.slice(4)).toUpperCase(); }
+  function normCode(s) {
+    var c = String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    return c.length === 8 ? c : null;
+  }
+  function cancelPair() {
+    if (!pair) return;
+    clearInterval(pair.timer);
+    rawApi('DELETE', '/pair/' + pair.code, undefined, function () {});
+    pair = null;
+    $('pair-box').className = 'codebox hidden';
+    $('btn-pair').textContent = 'ペアリングコードを表示';
+  }
+  function tickPair() {
+    if (!pair) return;
+    var left = Math.max(0, Math.ceil((pair.exp - now()) / 1000));
+    if (!left) { cancelPair(); $('pair-msg').className = 'msg'; $('pair-msg').textContent = 'コードの有効期限が切れました。必要ならもう一度表示してください。'; return; }
+    $('pair-left').textContent = 'あと ' + Math.floor(left / 60) + ':' + pad2(left % 60) + ' 有効（1回だけ使えます）';
+  }
+  on($('btn-pair'), 'click', function () {
+    if (pair) { cancelPair(); $('pair-msg').textContent = ''; return; }
+    var code = makeCode(), exp = now() + PAIR_MS;
+    $('pair-msg').className = 'msg'; $('pair-msg').textContent = '準備中…';
+    rawApi('PUT', '/pair/' + code, { k: KEY, exp: exp }, function (err) {
+      if (err) {
+        $('pair-msg').textContent = (err.status === 401 || err.status === 403)
+          ? 'ペアリングコードを使うには、Firebase のルールの更新が必要です。'
+          : 'コードを作れませんでした（' + errText(err) + '）。';
+        return;
+      }
+      pair = { code: code, exp: exp, timer: setInterval(tickPair, 1000) };
+      $('pair-code').textContent = fmtCode(code);
+      $('pair-box').className = 'codebox';
+      $('btn-pair').textContent = 'コードを取り消す';
+      $('pair-msg').textContent = '';
+      tickPair();
+    });
+  });
+  function redeemCode(where) {
+    var msg = $(where + '-msg'), code = normCode($('inp-code-' + where).value);
+    msg.className = 'msg';
+    if (!code) { msg.textContent = 'ペアリングコードは8文字です。もう一度確認してください。'; return; }
+    msg.textContent = '確認中…';
+    rawApi('GET', '/pair/' + code, undefined, function (err, data) {
+      var k = data && data.k ? normKey(data.k) : null;
+      if (err || !k) {
+        msg.textContent = (err && err.status === 0)
+          ? '接続できません。ネットワークを確認してください。'
+          : 'コードが見つからないか、期限切れです。もう一度表示してもらってください。';
+        return;
+      }
+      rawApi('DELETE', '/pair/' + code, undefined, function () {}); // 1回使ったら消す
+      $('inp-code-' + where).value = '';
+      msg.textContent = '';
+      applyKey(k);
+    });
+  }
+  each(document.querySelectorAll('[data-code]'), function (b) {
+    on(b, 'click', function () { redeemCode(b.getAttribute('data-code')); });
+  });
+  // 入力中に4文字ごとにハイフンを入れて見やすく
+  each(document.querySelectorAll('.code-in'), function (inp) {
+    on(inp, 'input', function () {
+      var c = inp.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+      var v = c.length > 4 ? c.slice(0, 4) + '-' + c.slice(4) : c;
+      if (v !== inp.value) inp.value = v;
+    });
+  });
+
+  /* ---- QR 読み取り（カメラのある新しい端末のみ） ---- */
+  var canScan = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  each(document.querySelectorAll('.scan-only'), function (el) { el.className = canScan ? 'scan-only' : 'scan-only hidden'; });
+  each(document.querySelectorAll('.noscan-only'), function (el) { el.className = canScan ? 'noscan-only hidden' : 'noscan-only'; });
+  var scan = null; // {stream, timer, detector, where}
+  function loadJsQR(cb) {
+    if (window.jsQR) { cb(); return; }
+    var sc = document.createElement('script');
+    sc.src = 'vendor/jsQR.js'; sc.onload = function () { cb(); }; sc.onerror = function () { cb(); };
+    document.head.appendChild(sc);
+  }
+  function stopScan() {
+    if (!scan) return;
+    clearTimeout(scan.timer);
+    if (scan.stream) each(scan.stream.getTracks(), function (t) { t.stop(); });
+    $('scan-video').srcObject = null;
+    scan = null;
+    $('scanner').className = 'hidden';
+  }
+  function scanFound(text) {
+    var k = keyFromText(text);
+    if (!k) { $('scan-msg').textContent = 'このQRコードは手書きメモの合言葉ではありません'; return false; }
+    stopScan();
+    applyKey(k);
+    return true;
+  }
+  function scanLoop() {
+    if (!scan) return;
+    var v = $('scan-video'), next = function () { if (scan) scan.timer = setTimeout(scanLoop, 200); };
+    if (v.readyState < 2 || !v.videoWidth) { next(); return; }
+    if (scan.detector) {
+      scan.detector.detect(v).then(function (codes) {
+        if (codes && codes.length && scanFound(codes[0].rawValue)) return;
+        next();
+      }, function () { scan.detector = null; next(); });
+      return;
+    }
+    if (window.jsQR) {
+      var w = 480, h = Math.round(v.videoHeight * 480 / v.videoWidth);
+      var c = scan.canvas || (scan.canvas = document.createElement('canvas'));
+      c.width = w; c.height = h;
+      var x = c.getContext('2d'); x.drawImage(v, 0, 0, w, h);
+      var r = window.jsQR(x.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'dontInvert' });
+      if (r && r.data && scanFound(r.data)) return;
+    }
+    next();
+  }
+  function startScan(where) {
+    var msg = $(where + '-msg');
+    msg.className = 'msg'; msg.textContent = '';
+    $('scan-msg').textContent = 'ほかの端末の「設定」に表示されたQRコードを枠に合わせてください';
+    $('scanner').className = '';
+    scan = { where: where };
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false }).then(function (stream) {
+      if (!scan) { each(stream.getTracks(), function (t) { t.stop(); }); return; }
+      scan.stream = stream;
+      var v = $('scan-video'); v.srcObject = stream;
+      var p = v.play(); if (p && p.catch) p.catch(function () {});
+      var go = function () { if (scan) scanLoop(); };
+      if (window.BarcodeDetector) {
+        try { scan.detector = new window.BarcodeDetector({ formats: ['qr_code'] }); } catch (e) { scan.detector = null; }
+      }
+      if (scan.detector) go(); else loadJsQR(go);
+    }, function (e) {
+      stopScan();
+      msg.textContent = (e && e.name === 'NotAllowedError')
+        ? 'カメラの使用が許可されていません。ペアリングコードを使ってください。'
+        : 'カメラを起動できませんでした。ペアリングコードを使ってください。';
+    });
+  }
+  each(document.querySelectorAll('[data-scan]'), function (b) {
+    on(b, 'click', function () { startScan(b.getAttribute('data-scan')); });
+  });
+  on($('btn-scan-cancel'), 'click', stopScan);
+
+  /* ---- URL（#k=…）で開かれたとき：カメラアプリでQRを読んだ場合など ---- */
+  function keyFromHash() {
+    if (!/[#&]k=/.test(location.hash)) return null;
+    var k = keyFromText(location.hash);
+    // アドレスに合言葉を残さない
+    try { window.history.replaceState(null, '', location.href.split('#')[0]); } catch (e) { location.hash = ''; }
+    return k;
+  }
+  on(window, 'hashchange', function () { var k = keyFromHash(); if (k) applyKey(k); });
+  on($('btn-change-key'), 'click', function () {
+    var k = normKey($('inp-key2').value);
+    if (!k) { $('settings-msg').textContent = '合言葉は英数字32文字です。もう一度確認してください。'; return; }
+    applyKey(k);
+  });
+  on($('btn-new-key'), 'click', function () { useKey(makeKey()); });
+  on($('btn-use-key'), 'click', function () {
+    var k = normKey($('inp-key').value);
+    if (!k) { $('setup-msg').textContent = '合言葉は英数字32文字です。もう一度確認してください。'; return; }
+    useKey(k);
+  });
+
+  /* ===================== 起動 ===================== */
+  var savedTool = lsJSON('memo_tool', null);
+  if (savedTool) { tool = savedTool.tool || tool; color = savedTool.color || color; sizeLv = savedTool.size || sizeLv; }
+  syncToolButtons();
+
+  on(window, 'resize', function () { if (cur) layout(); });
+  on(window, 'orientationchange', function () { setTimeout(function () { if (cur) layout(); }, 300); });
+  on(document, 'visibilitychange', function () {
+    if (document.hidden) { if (dirtyCount()) flush(); return; }
+    if (cur) pullCurrent(false); else refreshIndex();
+  });
+  // 一覧を開いている間も時々確認
+  setInterval(function () { if (KEY && !cur && $('scr-list').className.indexOf('hidden') < 0) refreshIndex(); }, 30000);
+
+  var hashKey = keyFromHash();
+  if (!KEY) { if (hashKey) useKey(hashKey); else show('scr-setup'); }
+  else {
+    show('scr-list'); renderList(); refreshIndex(); if (dirtyCount()) scheduleFlush(0);
+    if (hashKey && hashKey !== KEY) setTimeout(function () { applyKey(hashKey); }, 300);
+  }
+
+  // オフラインでも開けるように（新しい端末のみ。iOS 9 には Service Worker が無いので何もしない）
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+  }
+
+  // テスト用
+  window.__memo = { state: function () { return { key: KEY, index: index, dirty: dirty, cur: cur }; } };
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,2321 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<!-- このファイルは tools/build-legacy.js で index.html から自動生成しています。直接編集しないでください。 -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title id="page-title">キクタンTOEIC990</title>
+<style>
+    :root { 
+        --primary: #802028; 
+        --primary-light: rgba(128,32,40,0.80);
+        --bg: #f0f7f9; 
+        --card-bg: #ffffff; 
+        --text: #1c1c1e; 
+        --gray: #6c757d; 
+    }
+    body { 
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+        background: var(--bg); 
+        color: var(--text); 
+        margin: 0; 
+        padding: 0; 
+        display: flex; 
+        flex-direction: column; 
+        height: 100%; 
+        overflow: hidden; 
+    }
+    .hidden { display: none !important; }
+    .screen { 
+        display: none; 
+        flex-direction: column; 
+        height: 100%; 
+        padding: 15px; 
+        box-sizing: border-box; 
+    }
+    .active { display: flex; }
+    #screen-setup, #screen-list { overflow-y: auto; }
+
+    h2 { margin: 0 0 15px 0; text-align: center; font-size: 1.4rem; color: var(--primary); font-weight: 700; }
+    .panel { background: var(--card-bg); padding: 15px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 15px; }
+
+    .config-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+    .config-row:last-child { border-bottom: none; }
+    label { font-weight: 600; color: #444; font-size: 0.9rem; }
+    input[type="number"], input[type="text"] { width: 70px; padding: 8px; border-radius: 8px; border: 1px solid #ced4da; font-size: 1rem; text-align: center; }
+    input[type="text"] { width: 180px; text-align: left; }
+    input[type="color"] { width: 50px; height: 40px; border: none; background: transparent; cursor: pointer; }
+    select { padding: 8px; border-radius: 8px; font-size: 0.9rem; border: 1px solid #ced4da; background: white; }
+
+    .flashcard {
+        flex: 1; 
+        background: var(--card-bg); 
+        border-radius: 24px; 
+        box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+        display: flex; 
+        flex-direction: column; 
+        align-items: center; 
+        justify-content: flex-start;
+        text-align: center; 
+        padding: 20px; 
+        position: relative; 
+        margin-bottom: 10px; 
+        touch-action: none; 
+        -webkit-user-select: none; 
+        user-select: none;
+        overflow: hidden;
+        border: 2px solid transparent;
+        transition: border-color 0.2s;
+        gap: 6px;
+    }
+
+    .flashcard > * + * { 
+        margin-top: 6px; 
+}
+    .word-text { font-size: 2.4rem; font-weight: 800; margin: 34px 0 6px 0; color: var(--primary); line-height: 1.1; word-break: break-word; cursor: pointer; }
+    .meaning-text { font-size: 1.2rem; color: #333; margin-top: 8px; min-height: 1.5em; line-height: 1.4; font-weight: 500; }
+    .badge { position: absolute; top: 15px; right: 15px; background: var(--primary); color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; }
+    .btn-audio {
+        position:absolute; top: 12px; left: 12px;
+        width: 44px; height: 44px; border-radius: 14px;
+        background: rgba(0,0,0,0.05);
+        display:flex; align-items:center; justify-content:center;
+        font-size: 1.15rem;
+    }
+
+    button { border: none; cursor: pointer; font-size: 1rem; font-weight: 700; padding: 12px; border-radius: 12px; transition: all 0.2s; }
+    button:active { transform: scale(0.96); opacity: 0.9; }
+    .btn-block { width: 100%; display: block; margin-bottom: 10px; }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-secondary { background: var(--primary-light); color: white; }
+    .btn-outline { background: transparent; border: 1px solid var(--primary); color: var(--primary); }
+    .btn-danger { background: #ae2012; color: white; }
+    .btn-success { background: #2d6a4f; color: white; }
+    .btn-neutral { background: #dee2e6; color: #333; }
+
+    .nav-controls { display: flex; gap: 8px; margin-bottom: 10px; width: 100%; }
+
+    .nav-controls > * + * { 
+        margin-left: 8px; 
+}
+    .nav-btn { flex: 1; padding: 10px; background: #e9ecef; color: #495057; font-size: 0.85rem; }
+
+    .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 5px; }
+    .level-bar { display: flex; gap: 6px; margin-top: 10px; justify-content: center; }
+    .level-bar > * + * { 
+        margin-left: 6px; 
+}
+    .level-btn { width: 36px; height: 36px; border-radius: 50%; border: 2px solid #ced4da; background: white; color: #666; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; }
+    .level-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+    .table-container { flex: 1; overflow-y: auto; background: white; border-radius: 12px; border: 1px solid #eee; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    th { position: -webkit-sticky; position: sticky; top: 0; background: #f8f9fa; z-index: 1; padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6; }
+    td { padding: 10px; border-bottom: 1px solid #eee; }
+
+    #data-editor { width: 100%; height: 200px; font-family: monospace; font-size: 0.8rem; padding: 10px; box-sizing: border-box; border-radius: 8px; border: 1px solid #ccc; margin-bottom: 10px; }
+
+    #swipe-hint {
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        display: flex; align-items: center; justify-content: center;
+        background: rgba(255,255,255,0.7); color: var(--primary);
+        font-weight: bold; pointer-events: none; opacity: 0; transition: opacity 0.3s;
+        font-size: 1.5rem; z-index: 10;
+    }
+
+    /* Notes */
+    .note-area{
+        width: 100%;
+        margin-top: 10px;
+        display:flex;
+        flex-direction: column;
+        gap: 8px;
+        text-align:left;
+    }
+    .note-area > * + * { 
+        margin-top: 8px; 
+}
+    .note-title{
+        font-size:0.85rem; font-weight:800; color:#333; display:flex; justify-content:space-between; align-items:center;
+    }
+    .note-text{
+        width:100%;
+        min-height: 70px;
+        resize: vertical;
+        border-radius: 12px;
+        border: 1px solid #d6dbe0;
+        padding: 10px;
+        font-size: 0.95rem;
+        box-sizing: border-box;
+        background:#fff;
+    }
+    .draw-toolbar{
+        display:flex; gap:6px; flex-wrap:wrap; align-items:center;
+    }
+    .draw-toolbar > * + * { 
+        margin-top: 6px; 
+}
+    .tool-btn{
+        padding:8px 10px;
+        border-radius: 12px;
+        background:#e9ecef;
+        color:#333;
+        font-size:0.85rem;
+        font-weight:800;
+    }
+    .tool-btn.active{
+        background: var(--primary);
+        color:#fff;
+    }
+    .swatch{
+        width:30px; height:30px;
+        border-radius: 10px;
+        border: 2px solid rgba(0,0,0,0.1);
+        cursor:pointer;
+        box-sizing: border-box;
+    }
+    .swatch.active{ border-color: var(--primary); }
+    .range{
+        display:flex; gap:6px; align-items:center;
+        font-size:0.85rem; color:#444;
+        background: rgba(0,0,0,0.03);
+        padding: 6px 10px;
+        border-radius: 12px;
+    }
+    .range > * + * { 
+        margin-left: 6px; 
+}
+    .range input{ width: 120px; }
+    .canvas-wrap{
+        width:100%;
+        border-radius: 16px;
+        border: 1px solid #d6dbe0;
+        overflow:hidden;
+        background: #fff;
+        position: relative;
+        touch-action: none; /* allow drawing */
+    }
+    canvas#note-canvas{
+        width:100%;
+        height: 180px;
+        display:block;
+        background: #fff;
+    }
+
+    /* ===== Responsive: iPhone / small screens ===== */
+    @media (max-width: 480px) {
+        /* Make sure the bottom of handwriting area isn't clipped */
+        .flashcard{
+            padding: 14px; padding-bottom: 10px;
+            overflow: auto;                 /* allow scroll if still needed */
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .nav-controls{
+            margin-bottom: 6px;
+            gap: 6px;
+        }
+
+        .nav-controls > * + * { 
+                margin-left: 6px; 
+        }
+        .nav-btn{
+            padding: 6px 8px;               /* smaller vertical size */
+            font-size: 0.8rem;
+            border-radius: 10px;
+        }
+
+        .word-text{
+            margin-top: 26px;
+            margin-bottom: 4px;
+            font-size: 2.05rem;
+        }
+        #btn-show-meaning{
+            margin-top: 6px !important;
+            padding: 6px 14px !important;
+            font-size: 0.8rem !important;
+        }
+
+        .note-title{ margin-top: 6px; }
+        .note-text{
+            min-height: 42px;               /* one-line-ish */
+            height: 42px;
+            resize: none;
+            padding: 9px 12px;
+        }
+        .range{ padding: 4px 10px; }
+        canvas#note-canvas{
+            height: 260px;                  /* more room while fitting screen */
+        }
+
+        /* Make "中断" more visible */
+        #btn-exit{
+            background: #ae2012 !important;
+            color: #fff !important;
+            border: none !important;
+            padding: 6px 12px !important;
+            font-size: 0.8rem !important;
+            border-radius: 999px !important;
+        }
+    }
+    /* Very small height (landscape phone) */
+    @media (max-height: 520px) {
+        .flashcard{ overflow:auto; -webkit-overflow-scrolling: touch; }
+        canvas#note-canvas{ height: 200px; }
+        .note-text{ height: 40px; min-height: 40px; }
+        .nav-btn{ padding: 5px 8px; }
+    }
+
+
+    .range-inline{
+        margin-left:auto;
+        padding: 6px 10px;
+    }
+    .range-inline input{ width: 120px; }
+
+    /* Small phones: keep controls in one row and save vertical space */
+    @media (max-width: 480px) {
+        #screen-study{
+        .note-area{ gap: 6px; }
+        .note-area > * + * { 
+                        margin-top: 6px; 
+                }
+        .draw-toolbar{
+            flex-wrap: nowrap;                /* one row */
+            overflow-x: auto;                 /* allow horizontal scroll if too tight */
+            -webkit-overflow-scrolling: touch;
+            gap: 6px;
+            padding-bottom: 2px;
+        }
+        .draw-toolbar > * + * { 
+                        margin-top: 6px; 
+                }
+        .tool-btn{ padding: 7px 9px; font-size: 0.82rem; border-radius: 12px; }
+        .range-inline{
+            background: rgba(0,0,0,0.03);
+            padding: 5px 8px;
+            border-radius: 12px;
+            white-space: nowrap;
+        }
+        .range-inline input{ width: 90px; }
+        .swatch{ width: 28px; height: 28px; border-radius: 10px; }
+        #customColor{ width: 44px; height: 34px; }
+    }
+
+
+    /* Layout refinements */
+    .note-area{ margin-top: auto; } /* push notes (incl. canvas) towards bottom of card */
+    .canvas-wrap{ flex: 1 1 auto; }
+    #note-canvas{ height: 100%; }
+
+    @media (max-width: 480px) {
+        .option-row{
+            flex-wrap: nowrap;            /* keep color + thickness on one line */
+            justify-content: space-between;
+            align-items: center;
+        }
+        .option-row > div{ flex: 0 0 auto; }
+        .option-row .range-inline{ flex: 0 0 auto; }
+        .option-row .range-inline input{ width: 120px; }
+    }
+
+
+    @media (max-width: 480px) {
+        .note-area{ flex: 1 1 auto; }
+    }
+
+
+    /* ===== Toolbar layout (stable on iPhone) ===== */
+    .draw-toolbar{ display:flex; flex-direction:column; gap:8px; width:100%; }
+    .draw-toolbar > * + * { 
+                margin-top: 8px; 
+        }
+    .tool-row{
+        display:flex;
+        gap:6px;
+        width:100%;
+        justify-content:space-between;
+        flex-wrap:nowrap; /* always one row */
+    }
+    .tool-row > * + * { 
+                margin-left: 6px; 
+        }
+    .tool-row .tool-btn{
+        flex:1 1 0;
+        min-width: 0;
+        white-space: nowrap;
+        text-align:center;
+    }
+    .option-row{
+        display:flex;
+        gap:10px;
+        width:100%;
+        align-items:center;
+        justify-content:space-between;
+        flex-wrap:nowrap; /* one row: colors + thickness */
+    }
+    .option-row > * + * { 
+                margin-left: 10px; 
+        }
+    .color-row{
+        display:flex;
+        gap:6px;
+        align-items:center;
+        flex:0 0 auto;
+    }
+    .color-row > * + * { 
+                margin-left: 6px; 
+        }
+    .range-inline{
+        margin-left: 0;
+        white-space: nowrap;
+        flex:0 0 auto;
+        padding: 6px 10px;
+    }
+
+    @media (max-width: 480px) {
+        /* Keep two rows exactly */
+        .draw-toolbar{ gap:8px; }
+        .draw-toolbar > * + * { 
+                        margin-top: 8px; 
+                }
+        .tool-row .tool-btn{
+            padding: 7px 6px;
+            font-size: 0.82rem;
+            line-height: 1.1;
+        }
+        .option-row{ gap:8px; }
+        .option-row > * + * { 
+                        margin-left: 8px; 
+                }
+        .range-inline input{ width: 120px; }
+        /* Prevent accidental vertical stacking */
+        .tool-btn{ word-break: keep-all; }
+    }
+
+
+    /* ===== iPhone ergonomics ===== */
+    @media (max-width: 480px) {
+        /* Move the card a bit lower for easier one-hand swipe */
+        #screen-study{
+            padding-top: 40px;
+        }
+
+        /* Shrink bottom controls (Know/Don't know + levels) */
+        #controls-card .btn-success,
+        #controls-card .btn-danger{
+            padding: 10px 10px;
+            font-size: 0.95rem;
+        }
+        .level-bar{ gap: 5px; margin-top: 8px; }
+        .level-bar > * + * { 
+                        margin-left: 5px; 
+                }
+        .level-btn{
+            width: 32px;
+            height: 32px;
+            font-size: 0.85rem;
+        }
+    }
+
+
+    /* ===== Toolbar: keep stable on PC/iPad too ===== */
+    .tool-row{ flex-wrap: nowrap !important; }
+    .option-row{ flex-wrap: nowrap !important; }
+    .option-row .range-inline input{ width: 180px; }
+
+
+    /* Prevent iOS selection/callout while drawing */
+    #card-area, .note-area, .draw-toolbar, .tool-row, .option-row, .range-inline, .color-row,
+    .tool-btn, .swatch, #pen-size-label, #btn-show-meaning,  {
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+    }
+    #note-canvas{
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+    }
+
+
+    /* ===== Fix toolbar layout on PC / iPad (match smartphone layout) ===== */
+    #draw-toolbar.draw-toolbar { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+    #draw-toolbar.draw-toolbar > * + * { 
+                margin-top: 8px; 
+        }
+
+    /* 1st row: tools (always horizontal) */
+    #draw-toolbar .tool-row{
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 6px;
+        width: 100%;
+        justify-content: space-between;
+        align-items: center;
+    }
+    #draw-toolbar .tool-row > * + * { 
+                margin-left: 6px; 
+        }
+    #draw-toolbar .tool-row .tool-btn{
+        flex: 1 1 0;
+        min-width: 0;
+        white-space: nowrap;
+        text-align: center;
+    }
+
+    /* 2nd row: color + thickness (always horizontal) */
+    #draw-toolbar .option-row{
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 10px;
+        width: 100%;
+        align-items: center;
+        justify-content: space-between;
+    }
+    #draw-toolbar .option-row > * + * { 
+                margin-left: 10px; 
+        }
+    #draw-toolbar .color-row{
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 6px;
+        align-items: center;
+    }
+    #draw-toolbar .color-row > * + * { 
+                margin-left: 6px; 
+        }
+
+    /* Make sure color controls don't stack vertically on desktop */
+    #draw-toolbar .swatch{
+        display: inline-block;
+        width: 30px;
+        height: 30px;
+        border-radius: 10px;
+        box-sizing: border-box;
+    }
+    #draw-toolbar #customColor{
+        width: 50px;
+        height: 40px;
+        border: none;
+        background: transparent;
+        padding: 0;
+    }
+    #draw-toolbar .range-inline{
+        white-space: nowrap;
+        padding: 6px 10px;
+        border-radius: 12px;
+        background: rgba(0,0,0,0.03);
+    }
+    #draw-toolbar .range-inline input{ width: 180px; }
+
+    /* On very wide screens, avoid overly stretched buttons */
+    @media (min-width: 900px) {
+        #draw-toolbar .tool-row .tool-btn{ max-width: 180px; }
+    }
+
+
+    /* ===== FINAL OVERRIDE: toolbar must match mobile layout on ALL devices ===== */
+    #draw-toolbar { 
+        display:flex !important; 
+        flex-direction:column !important; 
+        gap:8px !important; 
+        width:100% !important;
+        align-items:stretch !important;
+    }
+    #draw-toolbar > * + * { 
+                margin-top: 8px; 
+        }
+    #draw-toolbar > .tool-row{
+        display:flex !important;
+        flex-direction:row !important;
+        flex-wrap:nowrap !important;
+        width:100% !important;
+        gap:6px !important;
+        justify-content:space-between !important;
+        align-items:center !important;
+    }
+    #draw-toolbar > .tool-row > * + * { 
+                margin-left: 6px; 
+        }
+    #draw-toolbar > .tool-row > .tool-btn{
+        flex:1 1 0 !important;
+        min-width:0 !important;
+        white-space:nowrap !important;
+        text-align:center !important;
+        padding: 8px 10px;
+    }
+    #draw-toolbar > .option-row{
+        display:flex !important;
+        flex-direction:row !important;
+        flex-wrap:nowrap !important;
+        width:100% !important;
+        gap:10px !important;
+        justify-content:space-between !important;
+        align-items:center !important;
+    }
+    #draw-toolbar > .option-row > * + * { 
+                margin-left: 10px; 
+        }
+    #draw-toolbar > .option-row > .color-row{
+        display:flex !important;
+        flex-direction:row !important;
+        flex-wrap:nowrap !important;
+        gap:6px !important;
+        align-items:center !important;
+    }
+    #draw-toolbar > .option-row > .color-row > * + * { 
+                margin-left: 6px; 
+        }
+    #draw-toolbar .swatch{ display:inline-block !important; }
+    #draw-toolbar #customColor{ display:inline-block !important; }
+
+    /* Keep the thickness control on the right and compact */
+    #draw-toolbar .range-inline{
+        display:flex !important;
+        align-items:center !important;
+        gap:8px !important;
+        white-space:nowrap !important;
+        flex:0 0 auto !important;
+    }
+    #draw-toolbar .range-inline > * + * { 
+                margin-left: 8px; 
+        }
+    #draw-toolbar .range-inline input{ width: 180px; }
+
+    /* If the screen is narrow (tablet split view), allow horizontal scroll rather than wrapping */
+    @media (max-width: 820px) {
+        #draw-toolbar > .tool-row{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+        #draw-toolbar > .option-row{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+        #draw-toolbar > .tool-row > .tool-btn{ flex:0 0 auto !important; }
+    }
+
+
+    /* Ensure draw-toolbar is column on desktop too (CSS safety net) */
+    .note-area #draw-toolbar{ flex-direction: column !important; align-items: stretch !important; }
+
+
+/* === Allow text selection on word/meaning (iPhone long-press copy) === */
+.word-text, .meaning-text {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  -webkit-touch-callout: default !important;
+  touch-action: auto !important;
+  pointer-events: auto !important;
+}
+
+
+}
+
+    /* ---- legacy (iOS 9) ---- */
+    html { height: 100%; }
+    .controls { display: -webkit-flex; display: flex; -webkit-justify-content: space-between; justify-content: space-between; }
+    .controls > * { width: calc(50% - 5px); }
+    .flex-gap-5 > * + * { margin-left: 5px; }
+    </style>
+
+<link rel="manifest" href="./manifest.webmanifest">
+
+<link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="./icons/icon-512.png">
+
+<link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon-180.png">
+<link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="./icons/favicon-16.png">
+<meta name="theme-color" content="#802028">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="キクタンTOEIC990">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+<link rel="apple-touch-startup-image" href="./splash/splash-1290x2796.png" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="./splash/splash-1290x2796.png" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)">
+<link rel="apple-touch-startup-image" href="./splash/splash-1179x2556.png" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="./splash/splash-1179x2556.png" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)">
+<link rel="apple-touch-startup-image" href="./splash/splash-1170x2532.png" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="./splash/splash-1170x2532.png" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)">
+<link rel="apple-touch-startup-image" href="./splash/splash-1125x2436.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="./splash/splash-1125x2436.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)">
+<link rel="apple-touch-startup-image" href="./splash/splash-828x1792.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="./splash/splash-828x1792.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)">
+<link rel="apple-touch-startup-image" href="./splash/splash-750x1334.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="./splash/splash-750x1334.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)">
+<link rel="apple-touch-startup-image" href="./splash/splash-640x1136.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="./splash/splash-640x1136.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)">
+<link rel="apple-touch-startup-image" href="./splash/splash-2048x2732.png" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="./splash/splash-2048x2732.png" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)">
+<link rel="apple-touch-startup-image" href="./splash/splash-1668x2388.png" media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="./splash/splash-1668x2388.png" media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)">
+<link rel="apple-touch-startup-image" href="./splash/splash-1668x2224.png" media="(device-width: 834px) and (device-height: 1112px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="./splash/splash-1668x2224.png" media="(device-width: 834px) and (device-height: 1112px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)">
+<link rel="apple-touch-startup-image" href="./splash/splash-1536x2048.png" media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="./splash/splash-1536x2048.png" media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)">
+
+</head>
+<body>
+
+    <!-- 1. Setup Screen -->
+    <div id="screen-setup" class="screen active">
+        <h2 id="display-title">キクタンTOEIC990</h2>
+
+        <div class="panel">
+            <div class="config-row">
+                <label>アプリ名</label>
+                <input type="text" id="inpTitle" value="キクタンTOEIC990" onchange="updateTheme()">
+            </div>
+            <div class="config-row">
+                <label>テーマカラー</label>
+                <input type="color" id="inpColor" value="#802028" onchange="updateTheme()">
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="config-row">
+                <label>学習範囲 (No.)</label>
+                <div class="flex-gap-5" style="display: flex; align-items: center;">
+                    <input type="number" id="inpStart" value="1" min="1" max="5000"> 〜 <input type="number" id="inpEnd" value="100" min="1" max="5000">
+                </div>
+            </div>
+            <select id="selQuickRange" onchange="handleQuickRangeChange(this.value)" style="width:100%; margin-top:5px;">
+                <option value="">クイック選択（100語単位）</option>
+                <option value="1-100">1 - 100</option>
+                <option value="101-200">101 - 200</option>
+                <option value="201-300">201 - 300</option>
+                <option value="301-400">301 - 400</option>
+                <option value="401-500">401 - 500</option>
+                <option value="501-600">501 - 600</option>
+                <option value="601-700">601 - 700</option>
+                <option value="701-800">701 - 800</option>
+                <option value="801-900">801 - 900</option>
+                <option value="901-1000">901 - 1000</option>
+                <option value="1001-1100">1001 - 1100</option>
+                <option value="1101-1200">1101 - 1200</option>
+                <option value="1-1200">1 - 1200 (全範囲)</option>
+            </select>
+        </div>
+
+        <div class="panel">
+            <div class="config-row">
+                <label for="chkReview">「わからない」のみ復習</label>
+                <input type="checkbox" id="chkReview">
+            </div>
+            <div class="config-row">
+                <label>理解度フィルター</label>
+                <select id="selLevel">
+                    <option value="all">すべて</option>
+                    <option value="0">未学習 (LV.0)</option>
+                    <option value="1">LV.1 (苦手)</option>
+                    <option value="2">LV.2</option>
+                    <option value="3">LV.3</option>
+                    <option value="4">LV.4</option>
+                    <option value="5">LV.5 (完璧)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="config-row">
+                <label for="selVoice">英語の声</label>
+                <select id="selVoice" onchange="saveVoiceChoice()" style="max-width:60%;">
+                    <option value="">自動（いちばん自然な声）</option>
+                </select>
+            </div>
+            <button class="btn-outline btn-block" onclick="testVoice()">🔊 この声で試す</button>
+            <div style="font-size:0.8rem; color:#888; margin-top:6px; line-height:1.5;">
+                より自然な声にするには、「設定」→「一般」→「アクセシビリティ」→「スピーチ」→「声」→「英語」で、「拡張」の声をダウンロードしてください。ダウンロード後にこのページを開き直すと一覧に出ます。
+            </div>
+        </div>
+
+        <div class="panel" id="cloud-panel">
+            <div style="font-weight:700; color:#444; margin-bottom:6px;">単語データ（クラウド）</div>
+            <div id="cloud-status" style="font-size:0.85rem; color:#555; line-height:1.6; margin-bottom:8px;"></div>
+            <div id="cloud-setup">
+                <div style="font-size:0.82rem; color:#777; line-height:1.6; margin-bottom:8px;">手書きメモの「設定」→「ほかの端末を追加」に出るQRコードかペアリングコードで、合言葉を設定してください。</div>
+                <button class="btn-outline btn-block cloud-scan hidden" onclick="cloudStartScan()">📷 QRコードを読み取る</button>
+                <input type="text" id="cloud-code" maxlength="9" autocapitalize="characters" autocorrect="off" autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX" style="width:100%; box-sizing:border-box; text-align:center; font-size:1.3rem; letter-spacing:3px; text-transform:uppercase; margin-bottom:8px;">
+                <button class="btn-secondary btn-block" onclick="cloudRedeem()">ペアリングコードで設定</button>
+                <details style="font-size:0.85rem; color:#555;">
+                    <summary style="cursor:pointer; margin-bottom:6px;">合言葉（32文字）を直接入力する</summary>
+                    <input type="text" id="cloud-key-in" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="xxxx-xxxx-…" style="width:100%; box-sizing:border-box; margin-bottom:8px; font-family:monospace;">
+                    <button class="btn-outline btn-block" onclick="cloudUseKeyInput()">この合言葉を使う</button>
+                </details>
+            </div>
+            <div id="cloud-ready" class="hidden">
+                <button class="btn-outline btn-block" onclick="cloudPull(true)">↻ クラウドから読み込み直す</button>
+                <button class="btn-outline btn-block" onclick="cloudPushManual()">この端末の単語データをクラウドに保存</button>
+            </div>
+            <div id="cloud-msg" style="font-size:0.85rem; color:#ae2012; min-height:1em;"></div>
+        </div>
+
+        <button class="btn-primary btn-block" onclick="startApp('card')">フラッシュカード開始</button>
+        <button class="btn-secondary btn-block" onclick="startApp('listen')">聞き流しモード開始</button>
+
+        <button class="btn-neutral btn-block" onclick="showList()">学習データ一覧 / 管理</button>
+        <div style="text-align:center; font-size:0.85rem; color:#999; margin-top:5px;">
+            登録数: <span id="totalCount">-</span>語
+        </div>
+    </div>
+
+    <!-- 2. Study Screen -->
+    <div id="screen-study" class="screen">
+        <div style="display:flex; justify-content:space-between; align-items:center; color:#666; font-size:0.85rem; margin-bottom:8px;">
+            <span id="progress-text">1 / 10</span>
+            <button class="btn-outline" style="padding:4px 10px; font-size:0.75rem; border-radius:20px;" onclick="goHome()" id="btn-exit">中断</button>
+        </div>
+
+        <div class="nav-controls">
+            <button class="nav-btn" onclick="manualMove(-1)">← 前</button>
+            <button class="nav-btn" onclick="manualMove(1)">次 →</button>
+        </div>
+
+        <div class="flashcard" id="card-area" aria-label="flashcard">
+            <div id="swipe-hint"></div>
+            <div id="badge-lv" class="badge">LV.0</div>
+            <button class="btn-audio" id="btn-audio" title="発音をもう一度" onclick="playWord(event)">🔊</button>
+
+            <div id="txt-word" class="word-text" onclick="playWord(event)">Word</div>
+            <div id="txt-meaning" class="meaning-text hidden">意味</div>
+
+            <button id="btn-show-meaning" class="btn-neutral" style="margin-top:10px; font-size:0.85rem; padding:8px 18px; border-radius:20px;" onclick="revealMeaning()">
+                日本語訳を表示
+            </button>
+
+            <!-- Notes -->
+            <div class="note-area" id="note-area">
+                <div class="note-title">
+                    <span>このカードのメモ</span>
+                    <button class="tool-btn" style="padding:6px 10px" onclick="clearAllNotes(event)" title="文字メモと手書きメモを全消し">全消し</button>
+                </div>
+
+                <textarea id="note-text" class="note-text" rows="1" placeholder="キーボードでメモ（このカード専用）"></textarea>
+
+                <div class="draw-toolbar" id="draw-toolbar">
+                <div class="tool-row">
+                    <button class="tool-btn active" id="tool-pen" onclick="setTool('pen', event)">ペン</button>
+                    <button class="tool-btn" id="tool-highlighter" onclick="setTool('highlighter', event)">蛍光ペン</button>
+                    <button class="tool-btn" id="tool-eraser" onclick="setTool('eraser', event)">消しゴム</button>
+                    <button class="tool-btn" onclick="clearCanvas(event)" title="手書きだけ消す">手書クリア</button>
+                </div>
+                <div class="option-row">
+                    <div class="color-row">
+                        <div class="swatch" data-color="#000000" style="background:#000000" onclick="pickColor('#000000', event)" title="黒"></div>
+                        <div class="swatch" data-color="#e63946" style="background:#e63946" onclick="pickColor('#e63946', event)" title="赤"></div>
+                        <input type="color" id="customColor" value="#000000" onchange="pickColor(this.value, event)" title="色を選ぶ">
+                    </div>
+                    <div class="range range-inline" title="太さ">
+                        <span>太さ</span>
+                        <input type="range" id="pen-size" min="2" max="24" value="5">
+                        <span id="pen-size-label">5</span>
+                    </div>
+                </div>
+            </div>
+
+                <div class="canvas-wrap" id="canvas-wrap">
+                    <canvas id="note-canvas"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card Mode Controls -->
+        <div id="controls-card">
+            <div class="controls">
+                <button class="btn-success" onclick="answer(true)">わかる</button>
+                <button class="btn-danger" onclick="answer(false)">わからない</button>
+            </div>
+            <div class="level-bar">
+                <button class="level-btn" onclick="setLevel(1)">1</button>
+                <button class="level-btn" onclick="setLevel(2)">2</button>
+                <button class="level-btn" onclick="setLevel(3)">3</button>
+                <button class="level-btn" onclick="setLevel(4)">4</button>
+                <button class="level-btn" onclick="setLevel(5)">5</button>
+            </div>
+        </div>
+
+        <!-- Listening Mode Controls -->
+        <div id="controls-listen" class="hidden text-center">
+            <p id="listen-status-label" style="color:var(--primary); font-weight:bold; font-size:0.9rem; margin:8px 0;">AUTO PLAYING...</p>
+            <button class="btn-neutral btn-block" onclick="togglePause()" id="btn-pause">一時停止</button>
+        </div>
+    </div>
+
+    <!-- 3. List/Manage Screen -->
+    <div id="screen-list" class="screen">
+        <h2>データ一覧 / 編集</h2>
+        <div class="filter-bar flex-gap-5" style="margin-bottom:10px; display:flex;">
+            <select id="selListLevelFilter" onchange="renderListTable()" style="flex:1">
+                <option value="all">全レベルを表示</option>
+                <option value="0">LV.0 (未着手)</option>
+                <option value="1">LV.1</option>
+                <option value="2">LV.2</option>
+                <option value="3">LV.3</option>
+                <option value="4">LV.4</option>
+                <option value="5">LV.5 (完璧)</option>
+            </select>
+            <select id="selListResultFilter" onchange="renderListTable()" style="flex:1">
+                <option value="all">全結果</option>
+                <option value="unknown">「わからない」のみ</option>
+                <option value="new">未回答のみ</option>
+            </select>
+        </div>
+        <div class="table-container">
+            <table id="list-table">
+                <thead><tr><th>No</th><th>単語 / 意味</th><th style="text-align:center">LV</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <div class="panel" style="margin-top:10px;">
+            <textarea id="data-editor" placeholder="word	meaning	number (TAB区切り)"></textarea>
+            <button class="btn-secondary btn-block" onclick="updateMasterData()">データを更新保存</button>
+            <button class="btn-danger btn-block" onclick="resetAllData()">⚠ 全データ初期化</button>
+        </div>
+        <button class="btn-primary btn-block" onclick="goHome()">設定に戻る</button>
+    </div>
+
+<div id="cloud-scanner" class="hidden" style="position:fixed; top:0; left:0; right:0; bottom:0; background:#000; z-index:100;">
+    <video id="cloud-video" playsinline muted autoplay style="position:absolute; top:0; left:0; width:100%; height:100%; object-fit:cover;"></video>
+    <div style="position:absolute; left:50%; top:45%; width:240px; height:240px; margin:-120px 0 0 -120px; border:3px solid rgba(255,255,255,.9); border-radius:18px; box-shadow:0 0 0 2000px rgba(0,0,0,.45);"></div>
+    <div style="position:absolute; left:0; right:0; bottom:0; padding:20px 20px 34px; text-align:center; color:#fff;">
+        <p id="cloud-scan-msg" style="margin:0 0 14px; line-height:1.6;">手書きメモの「設定」に表示されたQRコードを枠に合わせてください</p>
+        <button onclick="cloudStopScan()" style="background:#fff; color:#222; padding:12px 28px;">やめる</button>
+    </div>
+</div>
+
+<script>
+
+(function(){
+  if (window.NodeList && !NodeList.prototype.forEach) NodeList.prototype.forEach = Array.prototype.forEach;
+  if (window.HTMLCollection && !HTMLCollection.prototype.forEach) HTMLCollection.prototype.forEach = Array.prototype.forEach;
+  if (!Element.prototype.matches) Element.prototype.matches = Element.prototype.webkitMatchesSelector;
+  if (!Element.prototype.closest) Element.prototype.closest = function(s){ var el=this; while(el && el.nodeType===1){ if(el.matches(s)) return el; el=el.parentElement||el.parentNode; } return null; };
+  if (!String.prototype.padStart) String.prototype.padStart = function(n,c){ var s=String(this); c=c===undefined?' ':String(c); while(s.length<n) s=c+s; return s.slice(-Math.max(n,String(this).length)); };
+  if (!Array.prototype.includes) Array.prototype.includes = function(v){ return this.indexOf(v) !== -1; };
+  if (!String.prototype.includes) String.prototype.includes = function(v){ return this.indexOf(v) !== -1; };
+})();
+// === Storage namespace (per series) ===
+var APP_PREFIX = "kikutan_toeic990__";
+var k = function k(name) {
+  return APP_PREFIX + name;
+};
+
+// Basic wrappers (use names WITHOUT prefix)
+var lsGet = function lsGet(name) {
+  return localStorage.getItem(k(name));
+};
+var lsSet = function lsSet(name, value) {
+  return localStorage.setItem(k(name), value);
+};
+var lsRemove = function lsRemove(name) {
+  return localStorage.removeItem(k(name));
+};
+
+// One-time migration from legacy (non-prefixed) keys (so existing users keep their data)
+(function migrateLegacyOnce() {
+  var marker = k("__migrated_v1");
+  if (localStorage.getItem(marker)) return;
+  var legacyToNew = [["kikutan_master_tsv", k("master_tsv")], ["kikutan_theme_title", k("theme_title")], ["kikutan_theme_color", k("theme_color")]];
+
+  // copy simple keys if new doesn't exist yet
+  for (var _i = 0, _legacyToNew = legacyToNew; _i < _legacyToNew.length; _i++) {
+    var _legacyToNew$_i = _legacyToNew[_i],
+      oldK = _legacyToNew$_i[0],
+      newK = _legacyToNew$_i[1];
+    if (localStorage.getItem(oldK) !== null && localStorage.getItem(newK) === null) {
+      localStorage.setItem(newK, localStorage.getItem(oldK));
+    }
+  }
+
+  // copy per-card keys
+  var reKeys = [/^kikutan_stat_\d+$/, /^kikutan_memo_text_\d+$/, /^kikutan_memo_ink_\d+$/];
+  var _loop = function _loop() {
+      var keyName = localStorage.key(i);
+      if (!keyName) return 0; // continue
+      if (!reKeys.some(function (r) {
+        return r.test(keyName);
+      })) return 0; // continue
+      var newKeyName = k(keyName.replace(/^kikutan_/, "")); // stat_123 / memo_text_123 / memo_ink_123
+      if (localStorage.getItem(newKeyName) === null) {
+        localStorage.setItem(newKeyName, localStorage.getItem(keyName));
+      }
+    },
+    _ret;
+  for (var i = 0; i < localStorage.length; i++) {
+    _ret = _loop();
+    if (_ret === 0) continue;
+  }
+  localStorage.setItem(marker, "1");
+})();
+
+// Reset only this series' data
+function resetAllData() {
+  var ok = confirm("このシリーズ（TOEIC990）の学習履歴・メモ・手書きメモなどをすべて初期化します。\n本当に実行しますか？");
+  if (!ok) return;
+
+  // remove all keys with prefix
+  for (var i = localStorage.length - 1; i >= 0; i--) {
+    var keyName = localStorage.key(i);
+    if (keyName && keyName.startsWith(APP_PREFIX)) {
+      localStorage.removeItem(keyName);
+    }
+  }
+  alert("初期化しました。ページを再読み込みします。");
+  location.reload();
+}
+
+// 単語データはクラウド（Firebase）から読み込む。端末には master_tsv として保存される
+var masterTsv = '';
+var words = [];
+var studyQueue = [];
+var currentIndex = 0;
+var isListeningMode = false;
+var listenTimer = null;
+var isPaused = false;
+var touchStartPos = {
+  x: 0,
+  y: 0
+};
+var touchEndPos = {
+  x: 0,
+  y: 0
+};
+
+/* ===== Notes / Drawing state ===== */
+var currentTool = 'pen'; // pen | highlighter | eraser
+var currentColor = '#000000';
+var isDrawing = false;
+var lastPt = null;
+var canvas, ctx;
+var canvasDpr = 1;
+var memoSaveTimer = null;
+var drawSaveTimer = null;
+function memoTextKey(n) {
+  return k('memo_text_' + n);
+}
+function memoInkKey(n) {
+  return k('memo_ink_' + n);
+}
+window.onload = function () {
+  var savedData = lsGet('master_tsv');
+  if (savedData) masterTsv = savedData;
+  document.getElementById('data-editor').value = masterTsv.trim();
+  var savedTitle = lsGet('theme_title');
+  if (savedTitle) document.getElementById('inpTitle').value = savedTitle;
+  var savedColor = lsGet('theme_color');
+  if (savedColor) document.getElementById('inpColor').value = savedColor;
+  updateTheme(false);
+  parseData();
+  refreshMainStats();
+  setupSwipeHandlers();
+  loadVoices();
+  setupNotesUI();
+  cloudInit();
+  window.addEventListener('resize', function () {
+    if (canvas) {
+      requestAnimationFrame(function () {
+        enforceToolbarLayout();
+        adjustCanvasHeightForPhone();
+        resizeCanvasToDisplaySize();
+      });
+    }
+  });
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', function () {
+      if (canvas) {
+        requestAnimationFrame(function () {
+          enforceToolbarLayout();
+          adjustCanvasHeightForPhone();
+          resizeCanvasToDisplaySize();
+        });
+      }
+    });
+  }
+};
+function enforceToolbarLayout() {
+  var tb = document.getElementById('draw-toolbar');
+  if (!tb) return;
+
+  // Force the same 2-row layout on ALL devices (prevents CSS conflicts)
+  tb.style.display = 'flex';
+  tb.style.flexDirection = 'column';
+  tb.style.alignItems = 'stretch';
+  tb.style.gap = '8px';
+  tb.style.width = '100%';
+  var toolRow = tb.querySelector('.tool-row');
+  if (toolRow) {
+    toolRow.style.display = 'flex';
+    toolRow.style.flexDirection = 'row';
+    toolRow.style.flexWrap = 'nowrap';
+    toolRow.style.gap = '6px';
+    toolRow.style.justifyContent = 'space-between';
+    toolRow.style.alignItems = 'center';
+    toolRow.style.width = '100%';
+    toolRow.querySelectorAll('.tool-btn').forEach(function (btn) {
+      btn.style.flex = '1 1 0';
+      btn.style.minWidth = '0';
+      btn.style.whiteSpace = 'nowrap';
+      btn.style.textAlign = 'center';
+    });
+  }
+  var optRow = tb.querySelector('.option-row');
+  if (optRow) {
+    optRow.style.display = 'flex';
+    optRow.style.flexDirection = 'row';
+    optRow.style.flexWrap = 'nowrap';
+    optRow.style.gap = '10px';
+    optRow.style.justifyContent = 'space-between';
+    optRow.style.alignItems = 'center';
+    optRow.style.width = '100%';
+  }
+  var colorRow = tb.querySelector('.color-row');
+  if (colorRow) {
+    colorRow.style.display = 'flex';
+    colorRow.style.flexDirection = 'row';
+    colorRow.style.flexWrap = 'nowrap';
+    colorRow.style.gap = '6px';
+    colorRow.style.alignItems = 'center';
+  }
+  var range = tb.querySelector('.range-inline');
+  if (range) {
+    range.style.display = 'flex';
+    range.style.alignItems = 'center';
+    range.style.gap = '8px';
+    range.style.whiteSpace = 'nowrap';
+  }
+
+  // Normalize sizes so swatches don't stack on desktop
+  tb.querySelectorAll('.swatch').forEach(function (s) {
+    s.style.display = 'inline-block';
+    s.style.width = '30px';
+    s.style.height = '30px';
+  });
+  var cc = document.getElementById('customColor');
+  if (cc) {
+    cc.style.display = 'inline-block';
+    cc.style.width = '50px';
+    cc.style.height = '40px';
+  }
+}
+function setupNotesUI() {
+  var sizeRange = document.getElementById('pen-size');
+  var sizeLabel = document.getElementById('pen-size-label');
+  if (sizeRange && sizeLabel) sizeLabel.textContent = sizeRange.value;
+  // Defaults
+  applyToolDefaults('pen');
+  sizeRange.addEventListener('input', function () {
+    return sizeLabel.textContent = sizeRange.value;
+  });
+  document.getElementById('note-text').addEventListener('input', function () {
+    if (!studyQueue[currentIndex]) return;
+    var n = studyQueue[currentIndex].n;
+    clearTimeout(memoSaveTimer);
+    memoSaveTimer = setTimeout(function () {
+      localStorage.setItem(memoTextKey(n), document.getElementById('note-text').value);
+    }, 250);
+  });
+  highlightActiveSwatch();
+  canvas = document.getElementById('note-canvas');
+  ctx = canvas.getContext('2d', {
+    willReadFrequently: false
+  });
+  canvas.addEventListener('pointerdown', onPointerDown);
+  canvas.addEventListener('pointermove', onPointerMove);
+
+  // iOS: prevent long-press selection / callout while drawing
+  canvas.addEventListener('touchmove', function (e) {
+    if (isDrawing) e.preventDefault();
+  }, {
+    passive: false
+  });
+  window.addEventListener('pointerup', onPointerUp);
+  window.addEventListener('pointercancel', function () {
+    return endDrawing(true);
+  });
+  canvas.addEventListener('lostpointercapture', function () {
+    return endDrawing(true);
+  });
+  window.addEventListener('blur', function () {
+    return endDrawing(true);
+  });
+  if (!window.PointerEvent) {
+    var asPointer = function asPointer(ev) {
+      var t = ev.touches && ev.touches[0] || ev.changedTouches && ev.changedTouches[0] || ev;
+      return {
+        clientX: t.clientX,
+        clientY: t.clientY,
+        pointerType: ev.touches ? 'touch' : 'mouse',
+        buttons: 1,
+        pointerId: 1,
+        preventDefault: function preventDefault() {
+          return ev.preventDefault();
+        }
+      };
+    };
+    canvas.addEventListener('touchstart', function (ev) {
+      return onPointerDown(asPointer(ev));
+    }, false);
+    canvas.addEventListener('touchmove', function (ev) {
+      return onPointerMove(asPointer(ev));
+    }, false);
+    canvas.addEventListener('touchend', function () {
+      return endDrawing(true);
+    }, false);
+    canvas.addEventListener('touchcancel', function () {
+      return endDrawing(true);
+    }, false);
+    canvas.addEventListener('mousedown', function (ev) {
+      return onPointerDown(asPointer(ev));
+    }, false);
+    canvas.addEventListener('mousemove', function (ev) {
+      if (isDrawing) onPointerMove(asPointer(ev));
+    }, false);
+    window.addEventListener('mouseup', function () {
+      return endDrawing(true);
+    }, false);
+  }
+  ['pointerdown', 'pointermove', 'pointerup', 'touchstart', 'touchend', 'mousedown', 'mouseup', 'click'].forEach(function (evt) {
+    canvas.addEventListener(evt, function (e) {
+      return e.stopPropagation();
+    }, {
+      passive: false
+    });
+  });
+  document.getElementById('note-text').addEventListener('touchstart', function (e) {
+    return e.stopPropagation();
+  }, {
+    passive: true
+  });
+  document.getElementById('note-text').addEventListener('touchend', function (e) {
+    return e.stopPropagation();
+  }, {
+    passive: true
+  });
+  document.getElementById('note-text').addEventListener('click', function (e) {
+    return e.stopPropagation();
+  });
+  document.getElementById('draw-toolbar').addEventListener('click', function (e) {
+    return e.stopPropagation();
+  });
+  enforceToolbarLayout();
+}
+function updateTheme(shouldSave) {
+  if (shouldSave === void 0) {
+    shouldSave = true;
+  }
+  var title = document.getElementById('inpTitle').value;
+  var color = document.getElementById('inpColor').value;
+  document.getElementById('display-title').innerText = title;
+  document.getElementById('page-title').innerText = title;
+  document.documentElement.style.setProperty('--primary', color);
+  document.documentElement.style.setProperty('--primary-light', color + "cc");
+  if (shouldSave) {
+    lsSet('theme_title', title);
+    lsSet('theme_color', color);
+  }
+}
+function parseData() {
+  var lines = masterTsv.trim().split('\n');
+  words = lines.map(function (line) {
+    var parts = line.split('\t');
+    if (parts.length < 3) return null;
+    return {
+      w: parts[0].trim(),
+      m: parts[1].trim(),
+      n: parseInt(parts[2].trim())
+    };
+  }).filter(function (x) {
+    return x;
+  });
+}
+function refreshMainStats() {
+  // 登録数は「番号の最小〜最大」から算出（例: 707〜2126 → 1420語）
+  // ※欠番がある場合でも、ユーザーの要望どおり “範囲” を表示します
+  var nums = words.map(function (w) {
+    return Number(w.n);
+  }).filter(function (n) {
+    return Number.isFinite(n);
+  });
+  var count = words.length;
+  if (nums.length) {
+    var minN = Math.min.apply(Math, nums);
+    var maxN = Math.max.apply(Math, nums);
+    count = maxN - minN + 1;
+  }
+  document.getElementById('totalCount').innerText = count;
+}
+function updateMasterData() {
+  masterTsv = document.getElementById('data-editor').value;
+  lsSet('master_tsv', masterTsv);
+  parseData();
+  refreshMainStats();
+  if (cloudKey()) {
+    cloudPush(function (err) {
+      alert(err ? "端末には保存しましたが、クラウドへの保存に失敗しました（" + cloudErrText(err) + "）。" : "データを保存しました（クラウドにも保存済み）。");
+    });
+  } else {
+    alert("データを保存しました。");
+  }
+}
+
+/* ===== 単語データのクラウド保存（Firebase Realtime Database） =====
+   手書きメモと同じ合言葉・同じ場所（memos/合言葉/kiku）を使う。
+   合言葉は手書きメモと同じ localStorage のキー（memo_key）に置くので、同じブラウザなら共有される。 */
+var CLOUD_DB = 'https://kiku990-a838d-default-rtdb.asia-southeast1.firebasedatabase.app';
+function cloudKey() {
+  try {
+    return localStorage.getItem('memo_key') || '';
+  } catch (e) {
+    return '';
+  }
+}
+function setCloudKey(key) {
+  try {
+    localStorage.setItem('memo_key', key);
+  } catch (e) {}
+}
+function cloudNormKey(s) {
+  var raw = String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  return raw.length === 32 ? raw.replace(/(.{4})(?!$)/g, '$1-') : null;
+}
+function cloudKeyFromText(t) {
+  var m = String(t || '').match(/[#&?]k=([A-Za-z0-9-]+)/);
+  return cloudNormKey(m ? m[1] : t);
+}
+function cloudReq(method, path, body, cb) {
+  var x = new XMLHttpRequest();
+  x.open(method, CLOUD_DB + path + '.json', true);
+  x.timeout = 30000;
+  x.onreadystatechange = function () {
+    if (x.readyState !== 4) return;
+    if (x.status >= 200 && x.status < 300) {
+      var data = null;
+      try {
+        data = JSON.parse(x.responseText);
+      } catch (e) {}
+      cb(null, data);
+    } else cb({
+      status: x.status
+    });
+  };
+  if (body !== undefined) {
+    x.setRequestHeader('Content-Type', 'application/json');
+    x.send(JSON.stringify(body));
+  } else x.send();
+}
+function cloudErrText(err) {
+  if (!err) return '';
+  if (err.status === 0) return '接続できません';
+  if (err.status === 401 || err.status === 403) return '合言葉が登録されていません';
+  return 'エラー ' + err.status;
+}
+function cloudSetMsg(t, ok) {
+  var el = document.getElementById('cloud-msg');
+  el.textContent = t || '';
+  el.style.color = ok ? '#2d6a4f' : '#ae2012';
+}
+function cloudWordCount() {
+  return words.length;
+}
+function renderCloudPanel(statusText) {
+  var key = cloudKey();
+  document.getElementById('cloud-setup').className = key ? 'hidden' : '';
+  document.getElementById('cloud-ready').className = key ? '' : 'hidden';
+  var st = statusText;
+  if (!st) {
+    if (!key) st = cloudWordCount() ? '合言葉が未設定です。いまは端末内の単語データを使っています。' : '単語データがありません。合言葉を設定すると、クラウドから読み込みます。';else st = '合言葉：' + key.slice(0, 4) + '-…-' + key.slice(-4) + '（設定済み）';
+  }
+  document.getElementById('cloud-status').textContent = st;
+  var canScan = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  document.querySelectorAll('.cloud-scan').forEach(function (b) {
+    b.className = 'btn-outline btn-block cloud-scan' + (canScan ? '' : ' hidden');
+  });
+}
+function applyWords(tsv, updated) {
+  masterTsv = tsv;
+  lsSet('master_tsv', masterTsv);
+  lsSet('cloud_updated', String(updated || 0));
+  document.getElementById('data-editor').value = masterTsv.trim();
+  parseData();
+  refreshMainStats();
+}
+function cloudPush(cb) {
+  var key = cloudKey();
+  if (!key) {
+    if (cb) cb({
+      status: -1
+    });
+    return;
+  }
+  var t = Date.now();
+  cloudReq('PUT', '/memos/' + key + '/kiku', {
+    words: masterTsv.trim(),
+    updated: t
+  }, function (err) {
+    if (!err) lsSet('cloud_updated', String(t));
+    if (cb) cb(err);
+  });
+}
+function cloudPushManual() {
+  if (!cloudWordCount()) {
+    cloudSetMsg('この端末には単語データがありません。');
+    return;
+  }
+  if (!confirm('この端末の単語データ（' + cloudWordCount() + '語）で、クラウドの単語データを上書きしますか？')) return;
+  cloudSetMsg('保存中…', true);
+  cloudPush(function (err) {
+    cloudSetMsg(err ? 'クラウドに保存できませんでした（' + cloudErrText(err) + '）。' : 'クラウドに保存しました（' + cloudWordCount() + '語）。', !err);
+  });
+}
+// クラウドの単語データを読む。クラウドが空で、端末に単語があれば自動で保存する
+function cloudPull(manual) {
+  var key = cloudKey();
+  if (!key) {
+    renderCloudPanel();
+    return;
+  }
+  renderCloudPanel();
+  if (manual) cloudSetMsg('読み込み中…', true);
+  cloudReq('GET', '/memos/' + key + '/kiku', undefined, function (err, data) {
+    if (err) {
+      renderCloudPanel();
+      // 合言葉が違う（ルールで拒否）ときは、入力し直せるようにする
+      if (err.status === 401 || err.status === 403) document.getElementById('cloud-setup').className = '';
+      cloudSetMsg(cloudWordCount() ? 'クラウドに接続できません（' + cloudErrText(err) + '）。端末に保存した単語データを使っています。' : 'クラウドに接続できません（' + cloudErrText(err) + '）。');
+      return;
+    }
+    if (data && data.words) {
+      var localUpdated = Number(lsGet('cloud_updated') || 0);
+      if (manual || !cloudWordCount() || (data.updated || 0) > localUpdated) applyWords(data.words, data.updated);
+      renderCloudPanel();
+      cloudSetMsg('クラウドの単語データを使っています（' + cloudWordCount() + '語）。', true);
+      return;
+    }
+    // クラウドにまだ無い
+    if (cloudWordCount()) {
+      cloudPush(function (e2) {
+        renderCloudPanel();
+        cloudSetMsg(e2 ? 'クラウドに保存できませんでした（' + cloudErrText(e2) + '）。' : 'この端末の単語データ（' + cloudWordCount() + '語）をクラウドに保存しました。', !e2);
+      });
+    } else {
+      renderCloudPanel();
+      cloudSetMsg('クラウドに単語データがまだありません。単語データのある端末でこの画面を開いてください。');
+    }
+  });
+}
+function cloudUseKey(key) {
+  if (cloudKey() && cloudKey() !== key && !confirm('合言葉を切り替えますか？（手書きメモと同じ合言葉にしてください）')) return;
+  setCloudKey(key);
+  cloudSetMsg('');
+  cloudPull(true);
+}
+function cloudUseKeyInput() {
+  var key = cloudNormKey(document.getElementById('cloud-key-in').value);
+  if (!key) {
+    cloudSetMsg('合言葉は英数字32文字です。もう一度確認してください。');
+    return;
+  }
+  cloudUseKey(key);
+}
+function cloudRedeem() {
+  var code = String(document.getElementById('cloud-code').value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (code.length !== 8) {
+    cloudSetMsg('ペアリングコードは8文字です。もう一度確認してください。');
+    return;
+  }
+  cloudSetMsg('確認中…', true);
+  cloudReq('GET', '/pair/' + code, undefined, function (err, data) {
+    var key = data && data.k ? cloudNormKey(data.k) : null;
+    if (err || !key) {
+      cloudSetMsg(err && err.status === 0 ? '接続できません。ネットワークを確認してください。' : 'コードが見つからないか、期限切れです。手書きメモでもう一度表示してください。');
+      return;
+    }
+    cloudReq('DELETE', '/pair/' + code, undefined, function () {});
+    document.getElementById('cloud-code').value = '';
+    cloudUseKey(key);
+  });
+}
+document.addEventListener('input', function (e) {
+  if (!e.target || e.target.id !== 'cloud-code') return;
+  var c = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+  var v = c.length > 4 ? c.slice(0, 4) + '-' + c.slice(4) : c;
+  if (v !== e.target.value) e.target.value = v;
+});
+
+/* ---- QR 読み取り ---- */
+var cloudScan = null;
+function cloudStopScan() {
+  if (!cloudScan) return;
+  clearTimeout(cloudScan.timer);
+  if (cloudScan.stream) cloudScan.stream.getTracks().forEach(function (t) {
+    return t.stop();
+  });
+  document.getElementById('cloud-video').srcObject = null;
+  cloudScan = null;
+  document.getElementById('cloud-scanner').className = 'hidden';
+}
+function cloudScanFound(text) {
+  var key = cloudKeyFromText(text);
+  if (!key) {
+    document.getElementById('cloud-scan-msg').textContent = 'このQRコードは手書きメモの合言葉ではありません';
+    return false;
+  }
+  cloudStopScan();
+  cloudUseKey(key);
+  return true;
+}
+function cloudScanLoop() {
+  if (!cloudScan) return;
+  var v = document.getElementById('cloud-video');
+  var next = function next() {
+    if (cloudScan) cloudScan.timer = setTimeout(cloudScanLoop, 200);
+  };
+  if (v.readyState < 2 || !v.videoWidth) {
+    next();
+    return;
+  }
+  if (cloudScan.detector) {
+    cloudScan.detector.detect(v).then(function (codes) {
+      if (codes && codes.length && cloudScanFound(codes[0].rawValue)) return;
+      next();
+    }, function () {
+      cloudScan.detector = null;
+      next();
+    });
+    return;
+  }
+  if (window.jsQR) {
+    var w = 480,
+      h = Math.round(v.videoHeight * 480 / v.videoWidth);
+    var c = cloudScan.canvas || (cloudScan.canvas = document.createElement('canvas'));
+    c.width = w;
+    c.height = h;
+    var x = c.getContext('2d');
+    x.drawImage(v, 0, 0, w, h);
+    var r = window.jsQR(x.getImageData(0, 0, w, h).data, w, h, {
+      inversionAttempts: 'dontInvert'
+    });
+    if (r && r.data && cloudScanFound(r.data)) return;
+  }
+  next();
+}
+function cloudStartScan() {
+  cloudSetMsg('');
+  document.getElementById('cloud-scanner').className = '';
+  cloudScan = {};
+  navigator.mediaDevices.getUserMedia({
+    video: {
+      facingMode: 'environment'
+    },
+    audio: false
+  }).then(function (stream) {
+    if (!cloudScan) {
+      stream.getTracks().forEach(function (t) {
+        return t.stop();
+      });
+      return;
+    }
+    cloudScan.stream = stream;
+    var v = document.getElementById('cloud-video');
+    v.srcObject = stream;
+    var p = v.play();
+    if (p && p.catch) p.catch(function () {});
+    if (window.BarcodeDetector) {
+      try {
+        cloudScan.detector = new window.BarcodeDetector({
+          formats: ['qr_code']
+        });
+      } catch (e) {
+        cloudScan.detector = null;
+      }
+    }
+    if (cloudScan.detector || window.jsQR) {
+      cloudScanLoop();
+      return;
+    }
+    var sc = document.createElement('script');
+    sc.src = 'memo/vendor/jsQR.js';
+    sc.onload = sc.onerror = function () {
+      return cloudScanLoop();
+    };
+    document.head.appendChild(sc);
+  }, function (e) {
+    cloudStopScan();
+    cloudSetMsg(e && e.name === 'NotAllowedError' ? 'カメラの使用が許可されていません。ペアリングコードを使ってください。' : 'カメラを起動できませんでした。ペアリングコードを使ってください。');
+  });
+}
+
+/* ---- #k=… 付きで開かれたとき（カメラアプリでQRを読んだ場合など） ---- */
+function cloudKeyFromHash() {
+  if (!/[#&]k=/.test(location.hash)) return null;
+  var key = cloudKeyFromText(location.hash);
+  try {
+    history.replaceState(null, '', location.href.split('#')[0]);
+  } catch (e) {
+    location.hash = '';
+  }
+  return key;
+}
+function cloudInit() {
+  var hk = cloudKeyFromHash();
+  if (hk && hk !== cloudKey()) {
+    if (!cloudKey()) {
+      setCloudKey(hk);
+    } else {
+      setTimeout(function () {
+        return cloudUseKey(hk);
+      }, 300);
+    }
+  }
+  renderCloudPanel();
+  if (cloudKey()) cloudPull(false);
+}
+window.addEventListener('hashchange', function () {
+  var hk = cloudKeyFromHash();
+  if (hk) cloudUseKey(hk);
+});
+function handleQuickRangeChange(val) {
+  if (!val) return;
+  var parts = val.split('-');
+  document.getElementById('inpStart').value = parts[0];
+  document.getElementById('inpEnd').value = parts[1];
+}
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(function (s) {
+    return s.classList.remove('active');
+  });
+  document.getElementById(id).classList.add('active');
+}
+function goHome() {
+  stopAllAudio();
+  isPaused = true;
+  showScreen('screen-setup');
+}
+function stopAllAudio() {
+  if (listenTimer) {
+    clearTimeout(listenTimer);
+    listenTimer = null;
+  }
+  speakSeq++; // 再生中の発話のコールバックを無効化
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+}
+function getStatus(n) {
+  var key = k('stat_' + n);
+  var data = localStorage.getItem(key);
+  return data ? JSON.parse(data) : {
+    level: 0,
+    result: "new"
+  };
+}
+function saveStatus(n, status) {
+  localStorage.setItem(k('stat_' + n), JSON.stringify(status));
+}
+function startApp(mode) {
+  stopAllAudio();
+  var startNum = Number(document.getElementById('inpStart').value.trim()) || 1;
+  var endNum = Number(document.getElementById('inpEnd').value.trim()) || 9999;
+  var onlyReview = document.getElementById('chkReview').checked;
+  var filterLevel = document.getElementById('selLevel').value;
+  studyQueue = words.filter(function (item) {
+    var itemNo = Number(item.n);
+    if (itemNo < startNum || itemNo > endNum) return false;
+    var st = getStatus(item.n);
+    if (onlyReview && st.result !== 'unknown') return false;
+    if (filterLevel !== 'all' && String(st.level) !== String(filterLevel)) return false;
+    return true;
+  });
+  if (studyQueue.length === 0) {
+    alert("条件に一致する単語がありません。");
+    return;
+  }
+  currentIndex = 0;
+  isListeningMode = mode === 'listen';
+  isPaused = false;
+  document.getElementById('controls-card').className = isListeningMode ? 'hidden' : '';
+  document.getElementById('controls-listen').className = isListeningMode ? '' : 'hidden text-center';
+  showScreen('screen-study');
+  renderCard();
+}
+function renderCard() {
+  if (listenTimer) clearTimeout(listenTimer);
+  if (currentIndex < 0) currentIndex = 0;
+  if (currentIndex >= studyQueue.length) {
+    alert("最後まで到達しました。");
+    goHome();
+    return;
+  }
+  var item = studyQueue[currentIndex];
+  var status = getStatus(item.n);
+  document.getElementById('progress-text').innerText = currentIndex + 1 + " / " + studyQueue.length + " (No." + item.n + ")";
+  document.getElementById('txt-word').innerText = item.w;
+  document.getElementById('txt-meaning').innerText = item.m;
+  document.getElementById('txt-meaning').classList.add('hidden');
+  document.getElementById('btn-show-meaning').classList.remove('hidden');
+  document.getElementById('badge-lv').innerText = "LV." + status.level;
+  document.querySelectorAll('.level-btn').forEach(function (btn, idx) {
+    btn.classList.toggle('active', idx + 1 == status.level);
+  });
+  loadNotesFor(item.n);
+  if (!isPaused) {
+    speak(item.w, 'en-US', function () {
+      if (isListeningMode && !isPaused) {
+        listenTimer = setTimeout(function () {
+          if (isPaused) return;
+          revealMeaning(function () {
+            if (isListeningMode && !isPaused) {
+              listenTimer = setTimeout(function () {
+                if (isListeningMode && !isPaused) {
+                  currentIndex++;
+                  renderCard();
+                }
+              }, 400);
+            }
+          });
+        }, 800);
+      }
+    });
+  }
+}
+function manualMove(offset) {
+  stopAllAudio();
+  var nextIdx = currentIndex + offset;
+  if (nextIdx < 0 || nextIdx >= studyQueue.length) return;
+  currentIndex = nextIdx;
+  renderCard();
+}
+function revealMeaning(callback) {
+  var el = document.getElementById('txt-meaning');
+  var btn = document.getElementById('btn-show-meaning');
+  if (el.classList.contains('hidden')) {
+    el.classList.remove('hidden');
+    btn.classList.add('hidden');
+    var cleanText = studyQueue[currentIndex].m.replace(/\(.*\)/g, '').replace(/（.*）/g, '').replace(/[a-z]/gi, '');
+    speak(cleanText, 'ja-JP', callback);
+  } else if (callback) {
+    callback();
+  }
+}
+var lastPlayWordAt = 0;
+function playWord(e) {
+  if (e) {
+    e.stopPropagation();
+    e.preventDefault();
+  }
+  if (!studyQueue[currentIndex]) return;
+  // iOS: 1回のタップで touchend と click の両方が来るため、二重再生を防ぐ
+  var now = Date.now();
+  if (now - lastPlayWordAt < 500) return;
+  lastPlayWordAt = now;
+  speak(studyQueue[currentIndex].w, 'en-US');
+}
+
+/* ===== Speech (iOS対策込み) ===== */
+var cachedVoices = [];
+function loadVoices() {
+  try {
+    cachedVoices = window.speechSynthesis.getVoices() || [];
+  } catch (e) {
+    cachedVoices = [];
+  }
+  try {
+    if (typeof renderVoiceOptions === 'function') renderVoiceOptions();
+  } catch (e) {}
+}
+
+// 声の自然さの目安。Premium/拡張 を優先し、効果音系・Eloquence系の機械的な声は避ける
+var NOVELTY_VOICES = /^(Albert|Bad News|Bahh|Bells|Boing|Bubbles|Cellos|Good News|Jester|Organ|Superstar|Trinoids|Whisper|Wobble|Zarvox|Junior|Ralph|Kathy|Fred|Eddy|Flo|Grandma|Grandpa|Reed|Rocko|Sandy|Shelley)\b/i;
+var GOOD_VOICES = /^(Samantha|Ava|Allison|Susan|Zoe|Evan|Nathan|Tom|Alex|Nicky|Joelle|Noelle|Serena|Daniel|Kate|Oliver|Karen|Lee|Moira|Tessa|Kyoko|Otoya|O-ren|Hattori)\b/i;
+function normLang(v) {
+  return (v.lang || '').toLowerCase().replace('_', '-');
+}
+function voiceScore(v, lang) {
+  var name = v.name || '',
+    uri = v.voiceURI || '';
+  var sc = 0;
+  if (NOVELTY_VOICES.test(name) || /eloquence|speech\.synthesis\.voice/i.test(uri)) sc -= 200;
+  if (/premium/i.test(name + uri)) sc += 100;else if (/enhanced|拡張/i.test(name + uri)) sc += 80;
+  if (GOOD_VOICES.test(name)) sc += 30;
+  if (normLang(v) === lang.toLowerCase()) sc += 10;
+  if (v.localService) sc += 5;
+  return sc;
+}
+function rankedVoices(lang) {
+  // ここで loadVoices() を呼ぶと renderVoiceOptions と互いに呼び合って止まらなくなるので、一覧だけ取り直す
+  if (!cachedVoices.length) {
+    try {
+      cachedVoices = window.speechSynthesis.getVoices() || [];
+    } catch (e) {
+      cachedVoices = [];
+    }
+  }
+  var base = lang.toLowerCase().split('-')[0];
+  return cachedVoices.filter(function (v) {
+    return normLang(v).startsWith(base);
+  }).map(function (v) {
+    return {
+      v: v,
+      sc: voiceScore(v, lang)
+    };
+  }).sort(function (a, b) {
+    return b.sc - a.sc;
+  }).map(function (x) {
+    return x.v;
+  });
+}
+function pickVoice(lang) {
+  if (lang.toLowerCase().startsWith('en')) {
+    var saved = function () {
+      try {
+        return lsGet('voice_en') || '';
+      } catch (e) {
+        return '';
+      }
+    }();
+    if (saved) {
+      var v = cachedVoices.find(function (x) {
+        return x.voiceURI === saved;
+      });
+      if (v) return v;
+    }
+  }
+  var list = rankedVoices(lang);
+  return list.length && voiceScore(list[0], lang) > -100 ? list[0] : null;
+}
+function renderVoiceOptions() {
+  var sel = document.getElementById('selVoice');
+  if (!sel) return;
+  var saved = '';
+  try {
+    saved = lsGet('voice_en') || '';
+  } catch (e) {}
+  var list = rankedVoices('en-US').filter(function (v) {
+    return voiceScore(v, 'en-US') > -100;
+  });
+  sel.innerHTML = '';
+  var auto = document.createElement('option');
+  auto.value = '';
+  auto.textContent = '自動（いちばん自然な声）';
+  sel.appendChild(auto);
+  list.forEach(function (v) {
+    var o = document.createElement('option');
+    o.value = v.voiceURI;
+    o.textContent = v.name + "\uFF08" + v.lang + "\uFF09";
+    sel.appendChild(o);
+  });
+  sel.value = list.some(function (v) {
+    return v.voiceURI === saved;
+  }) ? saved : '';
+}
+// 声の一覧の読み込みは、上の判定用の定数・関数がすべて定義された後で行う
+if ('speechSynthesis' in window) {
+  try {
+    loadVoices();
+  } catch (e) {}
+  if (window.speechSynthesis.addEventListener) {
+    window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
+  } else {
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+  }
+}
+function saveVoiceChoice() {
+  var sel = document.getElementById('selVoice');
+  try {
+    lsSet('voice_en', sel.value);
+  } catch (e) {}
+}
+function testVoice() {
+  speak('The quarterly report has been submitted. accommodate', 'en-US');
+}
+
+// iOSは最初の発話がユーザー操作の中でないと音声が有効にならないため、最初のタップで空発話して解錠する
+var speechUnlocked = false;
+function unlockSpeech() {
+  if (speechUnlocked || !('speechSynthesis' in window)) return;
+  speechUnlocked = true;
+  try {
+    var u = new SpeechSynthesisUtterance(' ');
+    u.volume = 0;
+    window.speechSynthesis.speak(u);
+  } catch (e) {}
+}
+['touchend', 'click', 'keydown'].forEach(function (ev) {
+  return document.addEventListener(ev, unlockSpeech, {
+    capture: true,
+    passive: true
+  });
+});
+var speakSeq = 0;
+function speak(text, lang, callback) {
+  if (!('speechSynthesis' in window)) {
+    if (callback) callback();
+    return;
+  }
+  var synth = window.speechSynthesis;
+  var seq = ++speakSeq;
+  var done = false;
+  var finish = function finish() {
+    if (done || seq !== speakSeq) return; // 後から別の発話が始まっていたらコールバックしない
+    done = true;
+    if (callback) callback();
+  };
+  var uttr = new SpeechSynthesisUtterance(text);
+  uttr.lang = lang;
+  var voice = pickVoice(lang);
+  if (voice) uttr.voice = voice;
+  uttr.rate = 1.0;
+  uttr.onend = finish;
+  uttr.onerror = finish;
+  var doSpeak = function doSpeak() {
+    if (seq !== speakSeq) return;
+    try {
+      synth.resume();
+    } catch (e) {} // iOSで一時停止状態に固まるのを防ぐ
+    synth.speak(uttr);
+  };
+  if (synth.speaking || synth.pending) {
+    // iOS: cancel() 直後の speak() は捨てられることがあるので少し待つ
+    synth.cancel();
+    setTimeout(doSpeak, 80);
+  } else {
+    doSpeak();
+  }
+
+  // 保険：onend が来ない場合でも自動再生モードが止まらないように
+  var fallbackMs = Math.max(3000, String(text).length * 250);
+  setTimeout(function () {
+    if (!synth.speaking) finish();
+  }, fallbackMs);
+}
+function answer(isKnown) {
+  var item = studyQueue[currentIndex];
+  var st = getStatus(item.n);
+  st.result = isKnown ? 'known' : 'unknown';
+  saveStatus(item.n, st);
+  showSwipeHint(isKnown ? "わかる" : "わからない");
+  setTimeout(function () {
+    return manualMove(1);
+  }, 200);
+}
+function showSwipeHint(text) {
+  var hint = document.getElementById('swipe-hint');
+  hint.innerText = text;
+  hint.style.opacity = "1";
+  setTimeout(function () {
+    hint.style.opacity = "0";
+  }, 150);
+}
+function setLevel(lv) {
+  var item = studyQueue[currentIndex];
+  var st = getStatus(item.n);
+  st.level = lv;
+  saveStatus(item.n, st);
+  document.getElementById('badge-lv').innerText = "LV." + lv;
+  document.querySelectorAll('.level-btn').forEach(function (btn, idx) {
+    btn.classList.toggle('active', idx + 1 == lv);
+  });
+}
+function togglePause() {
+  isPaused = !isPaused;
+  var btn = document.getElementById('btn-pause');
+  var label = document.getElementById('listen-status-label');
+  if (isPaused) {
+    btn.innerText = "再開";
+    label.innerText = "PAUSED";
+    stopAllAudio();
+  } else {
+    btn.innerText = "一時停止";
+    label.innerText = "AUTO PLAYING...";
+    renderCard();
+  }
+}
+function isTextSelectableTarget(target) {
+  return !!(target && target.closest && (target.closest('.word-text') || target.closest('.meaning-text') || target.closest('#txt-word') || target.closest('#txt-meaning')));
+}
+
+/* ===== Swipe (tap -> replay audio) ===== */
+function setupSwipeHandlers() {
+  var card = document.getElementById('card-area');
+  card.addEventListener('touchstart', function (e) {
+    if (e.target.closest('.note-area') || isTextSelectableTarget(e.target)) return;
+    touchStartPos.x = e.touches[0].clientX;
+    touchStartPos.y = e.touches[0].clientY;
+  }, {
+    passive: true
+  });
+  card.addEventListener('touchend', function (e) {
+    if (e.target.closest('.note-area') || isTextSelectableTarget(e.target)) return;
+    touchEndPos.x = e.changedTouches[0].clientX;
+    touchEndPos.y = e.changedTouches[0].clientY;
+    handleSwipe();
+  }, {
+    passive: true
+  });
+  card.addEventListener('click', function (e) {
+    if (e.target.closest('button') || e.target.closest('.note-area') || e.target.closest('textarea') || isTextSelectableTarget(e.target)) return;
+    playWord(e);
+  });
+}
+function handleSwipe() {
+  var dx = touchEndPos.x - touchStartPos.x;
+  var dy = touchEndPos.y - touchStartPos.y;
+  var absX = Math.abs(dx);
+  var absY = Math.abs(dy);
+  var threshold = 50;
+  if (Math.max(absX, absY) < threshold) {
+    playWord();
+    return;
+  }
+  if (absX > absY) {
+    if (dx > 0) {
+      manualMove(-1);
+    } else {
+      manualMove(1);
+    }
+  } else {
+    if (dy > 0) {
+      answer(false);
+    } else {
+      answer(true);
+    }
+  }
+}
+
+/* ===== Notes storage & Drawing ===== */
+function loadNotesFor(n) {
+  var text = localStorage.getItem(memoTextKey(n)) || '';
+  document.getElementById('note-text').value = text;
+  requestAnimationFrame(function () {
+    adjustCanvasHeightForPhone();
+    enforceToolbarLayout();
+    adjustCanvasHeightForPhone();
+    resizeCanvasToDisplaySize();
+    clearCanvasPixels();
+    var ink = localStorage.getItem(memoInkKey(n));
+    if (ink) {
+      var img = new Image();
+      img.onload = function () {
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        ctx.restore();
+      };
+      img.src = ink;
+    }
+  });
+}
+function adjustCanvasHeightForPhone() {
+  // Only for small screens (iPhone etc.)
+  if (!canvas) return;
+  if (window.matchMedia && !window.matchMedia('(max-width: 480px)').matches) return;
+  var wrap = document.getElementById('canvas-wrap');
+  var card = document.getElementById('card-area');
+  if (!wrap || !card) return;
+
+  // We want the canvas to fit INSIDE the white card, above the blue area (controls).
+  // So we measure from the canvas top to the card bottom.
+  var cardRect = card.getBoundingClientRect();
+  var canvasRect = canvas.getBoundingClientRect();
+  var bottomPadding = 10; // small breathing room inside card
+  var desiredCssH = Math.floor(cardRect.bottom - canvasRect.top - bottomPadding);
+
+  // Keep the handwriting area compact on phones (~2/3 of the available space)
+  desiredCssH = Math.floor(desiredCssH * 0.55);
+
+  // If the keyboard is open, visualViewport height shrinks; keep within viewport too.
+  var vv = window.visualViewport;
+  var viewportH = vv ? vv.height : window.innerHeight;
+  desiredCssH = Math.min(desiredCssH, Math.floor(viewportH - canvasRect.top - bottomPadding));
+
+  // Safety limits
+  desiredCssH = Math.max(120, Math.min(desiredCssH, 210));
+  wrap.style.height = desiredCssH + 'px';
+  canvas.style.height = '100%';
+}
+function resizeCanvasToDisplaySize() {
+  var dpr = window.devicePixelRatio || 1;
+  canvasDpr = dpr;
+  var rect = canvas.getBoundingClientRect();
+  var newW = Math.max(1, Math.round(rect.width * dpr));
+  var newH = Math.max(1, Math.round(rect.height * dpr));
+  if (canvas.width !== newW || canvas.height !== newH) {
+    var old = document.createElement('canvas');
+    old.width = canvas.width;
+    old.height = canvas.height;
+    old.getContext('2d').drawImage(canvas, 0, 0);
+    canvas.width = newW;
+    canvas.height = newH;
+    ctx.drawImage(old, 0, 0, old.width, old.height, 0, 0, canvas.width, canvas.height);
+  }
+}
+function clearCanvasPixels() {
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.restore();
+}
+function screenToCanvasPoint(e) {
+  var rect = canvas.getBoundingClientRect();
+  var x = (e.clientX - rect.left) * canvasDpr;
+  var y = (e.clientY - rect.top) * canvasDpr;
+  return {
+    x: x,
+    y: y
+  };
+}
+function onPointerDown(e) {
+  if (!studyQueue[currentIndex]) return;
+  if (e) {
+    e.preventDefault();
+  }
+  try {
+    canvas.setPointerCapture(e.pointerId);
+  } catch (_) {}
+  isDrawing = true;
+  lastPt = screenToCanvasPoint(e);
+  drawDot(lastPt.x, lastPt.y);
+  scheduleInkSave();
+}
+function onPointerMove(e) {
+  if (e) {
+    e.preventDefault();
+  }
+  // If the user released the mouse button but we missed pointerup (common when leaving the window),
+  // stop drawing immediately.
+  if (e.pointerType === 'mouse' && isDrawing && e.buttons === 0) {
+    endDrawing(true);
+    return;
+  }
+  if (!isDrawing || !lastPt) return;
+  var pt = screenToCanvasPoint(e);
+  drawLine(lastPt.x, lastPt.y, pt.x, pt.y);
+  lastPt = pt;
+}
+function endDrawing(saveNow) {
+  if (saveNow === void 0) {
+    saveNow = true;
+  }
+  if (!isDrawing) return;
+  isDrawing = false;
+  lastPt = null;
+  if (saveNow) scheduleInkSave(true);
+}
+function onPointerUp(e) {
+  endDrawing(true);
+}
+function currentLineWidth() {
+  var v = parseInt(document.getElementById('pen-size').value, 10) || 6;
+  if (currentTool === 'highlighter') return v * 2.8;
+  if (currentTool === 'eraser') return v * 2.6;
+  return v;
+}
+function applyToolStyle() {
+  var lw = currentLineWidth();
+  ctx.lineWidth = lw;
+  ctx.lineJoin = 'round';
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = 'transparent';
+  if (currentTool === 'eraser') {
+    ctx.lineCap = 'round';
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.globalAlpha = 1.0;
+    ctx.strokeStyle = 'rgba(0,0,0,1)';
+    ctx.fillStyle = 'rgba(0,0,0,1)';
+    return;
+  }
+  if (currentTool === 'highlighter') {
+    // Marker-like: semi-transparent paint on top (not multiply),
+    // with a flatter tip feel.
+    ctx.lineCap = 'butt';
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 0.22;
+    ctx.strokeStyle = currentColor;
+    ctx.fillStyle = currentColor;
+
+    // tiny softness at edges
+    ctx.shadowBlur = Math.max(0, lw * 0.08);
+    ctx.shadowColor = currentColor;
+    return;
+  }
+
+  // normal pen
+  ctx.lineCap = 'round';
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 1.0;
+  ctx.strokeStyle = currentColor;
+  ctx.fillStyle = currentColor;
+}
+function drawDot(x, y) {
+  ctx.save();
+  applyToolStyle();
+  ctx.beginPath();
+  ctx.arc(x, y, ctx.lineWidth / 2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+function drawLine(x1, y1, x2, y2) {
+  ctx.save();
+  applyToolStyle();
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+  ctx.restore();
+  scheduleInkSave();
+}
+function scheduleInkSave(immediate) {
+  if (immediate === void 0) {
+    immediate = false;
+  }
+  if (!studyQueue[currentIndex]) return;
+  var n = studyQueue[currentIndex].n;
+  clearTimeout(drawSaveTimer);
+  var doSave = function doSave() {
+    try {
+      var dataUrl = canvas.toDataURL('image/png');
+      localStorage.setItem(memoInkKey(n), dataUrl);
+    } catch (err) {
+      // ignore quota errors
+    }
+  };
+  if (immediate) doSave();else drawSaveTimer = setTimeout(doSave, 350);
+}
+function applyToolDefaults(tool) {
+  var sizeRange = document.getElementById('pen-size');
+  var sizeLabel = document.getElementById('pen-size-label');
+  if (tool === 'pen') {
+    currentColor = '#000000';
+    if (sizeRange) sizeRange.value = '5';
+  } else if (tool === 'highlighter') {
+    currentColor = '#e63946'; // red marker
+    if (sizeRange) sizeRange.value = '15';
+  }
+  if (sizeRange && sizeLabel) sizeLabel.textContent = sizeRange.value;
+  var cc = document.getElementById('customColor');
+  if (cc) cc.value = currentColor;
+  highlightActiveSwatch();
+}
+function setTool(tool, e) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  currentTool = tool;
+
+  // When switching tools, also switch to the requested defaults
+  if (tool === 'pen' || tool === 'highlighter') {
+    applyToolDefaults(tool);
+  }
+  document.getElementById('tool-pen').classList.toggle('active', tool === 'pen');
+  document.getElementById('tool-highlighter').classList.toggle('active', tool === 'highlighter');
+  document.getElementById('tool-eraser').classList.toggle('active', tool === 'eraser');
+}
+function pickColor(color, e) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  currentColor = color;
+  document.getElementById('customColor').value = color;
+  highlightActiveSwatch();
+  if (currentTool === 'eraser') setTool('pen', e);
+}
+function highlightActiveSwatch() {
+  document.querySelectorAll('.swatch').forEach(function (el) {
+    el.classList.toggle('active', el.getAttribute('data-color') === currentColor);
+  });
+}
+function clearCanvas(e) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  if (!studyQueue[currentIndex]) return;
+  var n = studyQueue[currentIndex].n;
+  clearCanvasPixels();
+  localStorage.removeItem(memoInkKey(n));
+}
+function clearAllNotes(e) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  if (!studyQueue[currentIndex]) return;
+  var n = studyQueue[currentIndex].n;
+  if (!confirm('このカードの「文字メモ」と「手書きメモ」を全て消します。よろしいですか？')) return;
+  document.getElementById('note-text').value = '';
+  localStorage.removeItem(memoTextKey(n));
+  clearCanvas(e);
+}
+
+/* ===== List screen ===== */
+function showList() {
+  showScreen('screen-list');
+  renderListTable();
+}
+function renderListTable() {
+  var tbody = document.querySelector('#list-table tbody');
+  var filterLv = document.getElementById('selListLevelFilter').value;
+  var filterResult = document.getElementById('selListResultFilter').value;
+  tbody.innerHTML = '';
+  var fragment = document.createDocumentFragment();
+  words.forEach(function (item) {
+    var st = getStatus(item.n);
+    if (filterLv !== 'all' && String(st.level) !== filterLv) return;
+    if (filterResult !== 'all') {
+      if (filterResult === 'unknown' && st.result !== 'unknown') return;
+      if (filterResult === 'new' && st.result !== 'new') return;
+    }
+    var tr = document.createElement('tr');
+    tr.innerHTML = "<td>" + item.n + "</td>\n            <td><div style=\"font-weight:bold; color:var(--primary)\">" + item.w + "</div><div style=\"font-size:0.8em; color:#666\">" + item.m + "</div></td>\n            <td style=\"text-align:center\"><select onchange=\"updateLv(" + item.n + ", this.value)\">\n                " + [0, 1, 2, 3, 4, 5].map(function (v) {
+      return "<option value=\"" + v + "\" " + (st.level == v ? 'selected' : '') + ">" + v + "</option>";
+    }).join('') + "\n            </select></td>";
+    fragment.appendChild(tr);
+  });
+  tbody.appendChild(fragment);
+}
+function updateLv(n, lv) {
+  var st = getStatus(n);
+  st.level = parseInt(lv);
+  saveStatus(n, st);
+}
+
+// === Make word/meaning selectable (avoid swipe handlers cancelling long-press) ===
+(function () {
+  var w = document.getElementById('txt-word');
+  var m = document.getElementById('txt-meaning');
+  var stop = function stop(e) {
+    e.stopPropagation();
+  };
+  if (w) {
+    w.addEventListener('pointerdown', stop, {
+      passive: true
+    });
+    w.addEventListener('touchstart', stop, {
+      passive: true
+    });
+  }
+  if (m) {
+    m.addEventListener('pointerdown', stop, {
+      passive: true
+    });
+    m.addEventListener('touchstart', stop, {
+      passive: true
+    });
+  }
+})();
+</script>
+
+<script>
+if (false && "serviceWorker" in navigator) {
+  window.addEventListener("load", function () {
+    navigator.serviceWorker.register("./sw.js").catch(function () {});
+  });
+}
+</script>
+
+</body>
+</html>
