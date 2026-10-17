@@ -1017,6 +1017,12 @@ window.onload = function () {
   setupSwipeHandlers();
   loadVoices();
   setupNotesUI();
+  setupColorFallback(document.getElementById('customColor'), function (c) {
+    return pickColor(c);
+  });
+  setupColorFallback(document.getElementById('inpColor'), function () {
+    return updateTheme();
+  });
   cloudInit();
   renderResume();
   window.addEventListener('resize', function () {
@@ -1099,7 +1105,7 @@ function enforceToolbarLayout() {
     s.style.height = '30px';
   });
   var cc = document.getElementById('customColor');
-  if (cc) {
+  if (cc && !cc.getAttribute('data-fallback')) {
     cc.style.display = 'inline-block';
     cc.style.width = '50px';
     cc.style.height = '40px';
@@ -1224,6 +1230,7 @@ function updateTheme(shouldSave) {
     return parseInt(color.slice(i, i + 2), 16);
   });
   document.documentElement.style.setProperty('--primary-light', 'rgba(' + rgb.join(',') + ',0.8)');
+  if (typeof colorFallbacks !== 'undefined' && colorFallbacks.length) refreshColorFallbacks();
   if (shouldSave) {
     lsSet('theme_title', title);
     lsSet('theme_color', color);
@@ -2585,7 +2592,83 @@ function pickColor(color, e) {
   highlightActiveSwatch();
   if (currentTool === 'eraser') setTool('pen', e);
 }
+/* ===== 色選び：カラーピッカーが無い端末（iOS 9 など）用の色見本 ===== */
+var COLOR_CHOICES = ['#000000', '#555555', '#999999', '#802028', '#e63946', '#f4845f', '#f7b801', '#ffd43b', '#2d6a4f', '#52b788', '#0f9d9a', '#2463c9', '#1d3557', '#6a4c93', '#c77dff', '#ff70a6', '#8d5524', '#c68642', '#ffffff', '#ced4da'];
+function colorInputSupported() {
+  var t = document.createElement('input');
+  try {
+    t.setAttribute('type', 'color');
+  } catch (e) {
+    return false;
+  }
+  return t.type === 'color';
+}
+var colorFallbacks = [];
+function refreshColorFallbacks() {
+  colorFallbacks.forEach(function (f) {
+    f.btn.style.background = f.input.value || '#000000';
+  });
+}
+function closeColorPopup() {
+  var pop = document.getElementById('color-popup');
+  if (pop) pop.parentNode.removeChild(pop);
+}
+function openColorPopup(f) {
+  closeColorPopup();
+  var pop = document.createElement('div');
+  pop.id = 'color-popup';
+  pop.style.cssText = 'position:fixed; z-index:200; background:#fff; border-radius:14px; padding:8px; box-shadow:0 6px 24px rgba(0,0,0,.25); width:220px;';
+  COLOR_CHOICES.forEach(function (c) {
+    var sw = document.createElement('div');
+    sw.style.cssText = 'display:inline-block; width:36px; height:36px; margin:3px; border-radius:9px; vertical-align:top; cursor:pointer; box-sizing:border-box; border:' + (c.toLowerCase() === String(f.input.value).toLowerCase() ? '3px solid #1c1c1e' : '1px solid rgba(0,0,0,.15)') + '; background:' + c + ';';
+    var pick = function pick(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      f.input.value = c;
+      closeColorPopup();
+      f.onPick(c);
+      refreshColorFallbacks();
+    };
+    sw.addEventListener('click', pick);
+    pop.appendChild(sw);
+  });
+  document.body.appendChild(pop);
+  var r = f.btn.getBoundingClientRect();
+  var w = pop.offsetWidth,
+    h = pop.offsetHeight;
+  var left = Math.min(Math.max(8, r.left), window.innerWidth - w - 8);
+  var top = r.bottom + 6;
+  if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 6);
+  pop.style.left = left + 'px';
+  pop.style.top = top + 'px';
+}
+function setupColorFallback(input, onPick) {
+  if (!input || colorInputSupported()) return;
+  input.setAttribute('data-fallback', '1');
+  input.style.display = 'none';
+  var btn = document.createElement('div');
+  btn.title = '色を選ぶ';
+  btn.style.cssText = 'display:inline-block; width:44px; height:34px; border-radius:10px; vertical-align:middle; cursor:pointer; box-sizing:border-box; ' + 'border:3px solid #fff; box-shadow:0 0 0 1px rgba(0,0,0,.25);';
+  var f = {
+    input: input,
+    btn: btn,
+    onPick: onPick
+  };
+  btn.addEventListener('click', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (document.getElementById('color-popup')) closeColorPopup();else openColorPopup(f);
+  });
+  input.parentNode.insertBefore(btn, input.nextSibling);
+  colorFallbacks.push(f);
+  refreshColorFallbacks();
+}
+document.addEventListener('click', function (e) {
+  var pop = document.getElementById('color-popup');
+  if (pop && !pop.contains(e.target)) closeColorPopup();
+});
 function highlightActiveSwatch() {
+  if (colorFallbacks.length) refreshColorFallbacks();
   document.querySelectorAll('.swatch').forEach(function (el) {
     el.classList.toggle('active', el.getAttribute('data-color') === currentColor);
   });
