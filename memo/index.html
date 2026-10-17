@@ -889,6 +889,13 @@
   each(document.querySelectorAll('[data-code]'), function (b) {
     on(b, 'click', function () { redeemCode(b.getAttribute('data-code')); });
   });
+  // キーボードの「改行」でも送信できるように
+  on(document, 'keydown', function (e) {
+    var t = e.target; if (!t || (e.keyCode !== 13 && e.key !== 'Enter')) return;
+    var map = { 'inp-code-setup': function () { redeemCode('setup'); }, 'inp-code-settings': function () { redeemCode('settings'); },
+                'inp-key': function () { $('btn-use-key').click(); }, 'inp-key2': function () { $('btn-change-key').click(); } };
+    if (map[t.id]) { e.preventDefault(); t.blur(); map[t.id](); }
+  });
   // 入力中に4文字ごとにハイフンを入れて見やすく
   each(document.querySelectorAll('.code-in'), function (inp) {
     on(inp, 'input', function () {
