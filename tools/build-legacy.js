@@ -141,6 +141,10 @@ html = html.replace(/<style>([\s\S]*?)<\/style>/, (all, css) => {
     const extra = `
     /* ---- legacy (iOS 9) ---- */
     html { height: 100%; }
+    /* Safari 9 の古い flexbox は、縦に並んだ要素を中身より小さく縮めてしまう（パネルが重なる）。
+       設定画面・一覧画面では縮めずにスクロールさせる */
+    #screen-setup > *, #screen-list > *, .panel > * { -webkit-flex-shrink: 0; flex-shrink: 0; }
+    #screen-setup, #screen-list { -webkit-overflow-scrolling: touch; }
     .controls { display: -webkit-flex; display: flex; -webkit-justify-content: space-between; justify-content: space-between; }
     .controls > * { width: calc(50% - 5px); }
     .flex-gap-5 > * + * { margin-left: 5px; }
