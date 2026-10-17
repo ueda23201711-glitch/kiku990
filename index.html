@@ -703,6 +703,11 @@
                     <button class="tool-btn" style="padding:6px 10px" onclick="clearAllNotes(event)" title="文字メモと手書きメモを全消し">全消し</button>
                 </div>
 
+                <div id="note-ex" style="display:none; background:#fff; border:1px solid #e3e3e3; border-radius:10px; padding:8px 10px; margin:4px 0 6px; text-align:left; line-height:1.6;">
+                    <div style="margin-bottom:6px;"><button class="tool-btn" style="padding:4px 9px" onclick="playNoteEnglish(event)">🔊</button> <span id="note-ex-en" style="font-family:Georgia,serif; font-size:1.02rem;"></span></div>
+                    <div><button class="tool-btn" id="note-ex-jabtn" style="padding:4px 9px" onclick="toggleNoteJa(event)">訳を表示</button> <span id="note-ex-ja" style="display:none; color:#555; font-size:0.92rem;"></span></div>
+                    <div style="text-align:right; margin-top:4px;"><button class="tool-btn" style="padding:3px 8px; font-size:0.78rem" onclick="editNoteText(event)">✎ メモを編集</button></div>
+                </div>
                 <textarea id="note-text" class="note-text" rows="1" placeholder="キーボードでメモ（このカード専用）"></textarea>
 
                 <div class="draw-toolbar" id="draw-toolbar">
@@ -1667,10 +1672,48 @@ function noteEnglish() {
     const lines = t.split('\n').filter(l => (l.match(/[A-Za-z]/g) || []).length >= 8 && (l.match(/[A-Za-z]/g) || []).length > l.length * 0.5);
     return lines.join(' ').trim();
 }
+// 「例文: …」「訳: …」のメモは、例文だけ見せて訳はボタンで表示（メモ欄はたたむ）
+let noteExSeen = null, noteEditing = false;
 function updateNoteSayButton() {
     const b = document.getElementById('note-say');
     if (b) b.style.display = noteEnglish() ? '' : 'none';
+    const ta = document.getElementById('note-text'), box = document.getElementById('note-ex');
+    if (!ta || !box) return;
+    const t = String(ta.value || '');
+    const en = t.match(/例文\s*[:：]\s*([^\n]+)/), ja = t.match(/訳\s*[:：]\s*([^\n]+)/);
+    if (t !== noteExSeen) {
+        // カードが変わった（メモの中身が変わった）ら、訳は隠し直す
+        if (noteExSeen === null || !noteEditing) {
+            document.getElementById('note-ex-ja').style.display = 'none';
+            document.getElementById('note-ex-jabtn').textContent = '訳を表示';
+        }
+        noteExSeen = t;
+        if (en) document.getElementById('note-ex-en').textContent = en[1].trim();
+        document.getElementById('note-ex-ja').textContent = ja ? ja[1].trim() : '';
+        document.getElementById('note-ex-jabtn').style.display = ja ? '' : 'none';
+    }
+    const show = !!en && !noteEditing;
+    box.style.display = show ? '' : 'none';
+    ta.style.display = show ? 'none' : '';
 }
+function toggleNoteJa(e) {
+    if (e) { e.stopPropagation(); e.preventDefault(); }
+    const j = document.getElementById('note-ex-ja'), b = document.getElementById('note-ex-jabtn');
+    const on = j.style.display === 'none';
+    j.style.display = on ? '' : 'none';
+    b.textContent = on ? '訳を隠す' : '訳を表示';
+}
+function editNoteText(e) {
+    if (e) { e.stopPropagation(); e.preventDefault(); }
+    noteEditing = true; updateNoteSayButton();
+    const ta = document.getElementById('note-text');
+    try { ta.focus(); } catch (er) {}
+    ta.addEventListener('blur', function once() { ta.removeEventListener('blur', once); noteEditing = false; noteExSeen = null; updateNoteSayButton(); });
+}
+['touchstart', 'touchend', 'click'].forEach(ev => {
+    const box = document.getElementById('note-ex');
+    if (box) box.addEventListener(ev, (e) => e.stopPropagation(), ev === 'click' ? false : { passive: true });
+});
 setInterval(updateNoteSayButton, 800);
 function playNoteEnglish(e) {
     if (e) { e.stopPropagation(); e.preventDefault(); }
