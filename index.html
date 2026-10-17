@@ -661,6 +661,7 @@
             <div id="cloud-msg" style="font-size:0.85rem; color:#ae2012; min-height:1em;"></div>
         </div>
 
+        <button class="btn-primary btn-block hidden" id="btn-resume" onclick="resumeStudy()">▶ 続きから</button>
         <button class="btn-primary btn-block" onclick="startApp('card')">フラッシュカード開始</button>
         <button class="btn-secondary btn-block" onclick="startApp('listen')">聞き流しモード開始</button>
 
@@ -898,6 +899,7 @@ window.onload = function() {
     loadVoices();
     setupNotesUI();
     cloudInit();
+    renderResume();
     window.addEventListener('resize', () => {
         if (canvas) { requestAnimationFrame(() => { enforceToolbarLayout();
                 adjustCanvasHeightForPhone();
@@ -1133,6 +1135,7 @@ function renderCloudPanel(statusText) {
     document.querySelectorAll('.cloud-scan').forEach(b => { b.className = 'btn-outline btn-block cloud-scan' + (canScan ? '' : ' hidden'); });
 }
 function applyWords(tsv, updated) {
+    setTimeout(renderResume, 0);
     masterTsv = tsv;
     lsSet('master_tsv', masterTsv);
     lsSet('cloud_updated', String(updated || 0));
@@ -1334,6 +1337,7 @@ function syncFlush() {
     let size = 0;
     for (let i = 0; i < ids.length; i++) {
         const id = ids[i], parts = id.split('/'), type = parts[0], n = parts[1], t = syncDirty[id];
+        if (id === 'pos') { body.pos = posLocal(); sent[id] = t; continue; }
         const p = syncPayload(type, n, t);
         body[id] = p;
         if (type === 'ink') body['inkT/' + n] = t;
@@ -1362,8 +1366,8 @@ function syncPull(done) {
     const key = cloudKey();
     if (!key || syncPulling) { if (done) done(false); return; }
     syncPulling = true;
-    const srv = {}; let pending = 3;
-    ['st', 'tx', 'inkT'].forEach(name => {
+    const srv = {}; let pending = 4;
+    ['st', 'tx', 'inkT', 'pos'].forEach(name => {
         cloudReq('GET', '/memos/' + key + '/kiku/' + name, undefined, function (err, data) {
             srv[name] = err ? null : (data || {});
             if (--pending === 0) { syncPulling = false; syncMerge(srv); if (done) done(true); }
@@ -1372,6 +1376,10 @@ function syncPull(done) {
 }
 function syncMerge(srv) {
     if (!srv.st || !srv.tx || !srv.inkT) return;   // 通信できなかった
+    if (srv.pos && srv.pos.n && !syncDirty.pos && (srv.pos.t || 0) > (posLocal().t || 0)) {
+        lsSet('study_pos', JSON.stringify({ n: Number(srv.pos.n), t: srv.pos.t }));
+        renderResume();
+    }
     const cur = syncCurrentN();
     let changed = false;
     syncEach(srv.st, (n, v) => {
@@ -1415,6 +1423,41 @@ function syncMerge(srv) {
     }
     if (Object.keys(syncDirty).length) syncSchedule(500);
 }
+/* ---- 前回の続き（最後に開いたカードの番号） ---- */
+function posLocal() { try { return JSON.parse(lsGet('study_pos') || 'null') || {}; } catch (e) { return {}; } }
+function posMark(n) {
+    const p = posLocal();
+    if (Number(p.n) === Number(n)) return;
+    const t = Date.now();
+    lsSet('study_pos', JSON.stringify({ n: Number(n), t: t }));
+    syncDirty.pos = t; syncSave();
+    syncSchedule(3000);
+}
+function resumeNext() {
+    const p = posLocal();
+    if (!p.n || !words.length) return null;
+    const nums = words.map(w => Number(w.n)).filter(n => n > Number(p.n));
+    return nums.length ? Math.min.apply(null, nums) : null;
+}
+function renderResume() {
+    const btn = document.getElementById('btn-resume');
+    if (!btn) return;
+    const next = resumeNext();
+    if (!next) { btn.className = 'btn-primary btn-block hidden'; return; }
+    btn.className = 'btn-primary btn-block';
+    btn.textContent = '▶ 続きから（No.' + next + '〜）';
+}
+function resumeStudy() {
+    const next = resumeNext();
+    if (!next) return;
+    const inpS = document.getElementById('inpStart'), inpE = document.getElementById('inpEnd');
+    const end = Number(inpE.value) || 0;
+    inpS.value = next;
+    if (end < next) inpE.value = Math.min(next + 99, Math.max.apply(null, words.map(w => Number(w.n))));
+    document.getElementById('selQuickRange').value = '';
+    startApp('card');
+}
+
 function syncFetchInk(n) {
     const key = cloudKey();
     if (!key) return;
@@ -1469,6 +1512,7 @@ function goHome() {
     stopAllAudio();
     isPaused = true;
     showScreen('screen-setup');
+    renderResume();
     syncFlush(); syncPull();
 }
 
@@ -1534,6 +1578,7 @@ function renderCard() {
 
     const item = studyQueue[currentIndex];
     const status = getStatus(item.n);
+    posMark(item.n);
 
     document.getElementById('progress-text').innerText = `${currentIndex + 1} / ${studyQueue.length} (No.${item.n})`;
     document.getElementById('txt-word').innerText = item.w;

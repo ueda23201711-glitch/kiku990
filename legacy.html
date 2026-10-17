@@ -756,6 +756,7 @@ if (window.navigator.standalone === true && !/[?&]v=/.test(location.search)) { l
             <div id="cloud-msg" style="font-size:0.85rem; color:#ae2012; min-height:1em;"></div>
         </div>
 
+        <button class="btn-primary btn-block hidden" id="btn-resume" onclick="resumeStudy()">▶ 続きから</button>
         <button class="btn-primary btn-block" onclick="startApp('card')">フラッシュカード開始</button>
         <button class="btn-secondary btn-block" onclick="startApp('listen')">聞き流しモード開始</button>
 
@@ -1017,6 +1018,7 @@ window.onload = function () {
   loadVoices();
   setupNotesUI();
   cloudInit();
+  renderResume();
   window.addEventListener('resize', function () {
     if (canvas) {
       requestAnimationFrame(function () {
@@ -1345,6 +1347,7 @@ function renderCloudPanel(statusText) {
   });
 }
 function applyWords(tsv, updated) {
+  setTimeout(renderResume, 0);
   masterTsv = tsv;
   lsSet('master_tsv', masterTsv);
   lsSet('cloud_updated', String(updated || 0));
@@ -1677,6 +1680,11 @@ function syncFlush() {
       type = parts[0],
       n = parts[1],
       t = syncDirty[id];
+    if (id === 'pos') {
+      body.pos = posLocal();
+      sent[id] = t;
+      continue;
+    }
     var p = syncPayload(type, n, t);
     body[id] = p;
     if (type === 'ink') body['inkT/' + n] = t;
@@ -1716,8 +1724,8 @@ function syncPull(done) {
   }
   syncPulling = true;
   var srv = {};
-  var pending = 3;
-  ['st', 'tx', 'inkT'].forEach(function (name) {
+  var pending = 4;
+  ['st', 'tx', 'inkT', 'pos'].forEach(function (name) {
     cloudReq('GET', '/memos/' + key + '/kiku/' + name, undefined, function (err, data) {
       srv[name] = err ? null : data || {};
       if (--pending === 0) {
@@ -1730,6 +1738,13 @@ function syncPull(done) {
 }
 function syncMerge(srv) {
   if (!srv.st || !srv.tx || !srv.inkT) return; // 通信できなかった
+  if (srv.pos && srv.pos.n && !syncDirty.pos && (srv.pos.t || 0) > (posLocal().t || 0)) {
+    lsSet('study_pos', JSON.stringify({
+      n: Number(srv.pos.n),
+      t: srv.pos.t
+    }));
+    renderResume();
+  }
   var cur = syncCurrentN();
   var changed = false;
   syncEach(srv.st, function (n, v) {
@@ -1780,6 +1795,60 @@ function syncMerge(srv) {
     if (document.getElementById('screen-list').classList.contains('active')) renderListTable();
   }
   if (Object.keys(syncDirty).length) syncSchedule(500);
+}
+/* ---- 前回の続き（最後に開いたカードの番号） ---- */
+function posLocal() {
+  try {
+    return JSON.parse(lsGet('study_pos') || 'null') || {};
+  } catch (e) {
+    return {};
+  }
+}
+function posMark(n) {
+  var p = posLocal();
+  if (Number(p.n) === Number(n)) return;
+  var t = Date.now();
+  lsSet('study_pos', JSON.stringify({
+    n: Number(n),
+    t: t
+  }));
+  syncDirty.pos = t;
+  syncSave();
+  syncSchedule(3000);
+}
+function resumeNext() {
+  var p = posLocal();
+  if (!p.n || !words.length) return null;
+  var nums = words.map(function (w) {
+    return Number(w.n);
+  }).filter(function (n) {
+    return n > Number(p.n);
+  });
+  return nums.length ? Math.min.apply(null, nums) : null;
+}
+function renderResume() {
+  var btn = document.getElementById('btn-resume');
+  if (!btn) return;
+  var next = resumeNext();
+  if (!next) {
+    btn.className = 'btn-primary btn-block hidden';
+    return;
+  }
+  btn.className = 'btn-primary btn-block';
+  btn.textContent = '▶ 続きから（No.' + next + '〜）';
+}
+function resumeStudy() {
+  var next = resumeNext();
+  if (!next) return;
+  var inpS = document.getElementById('inpStart'),
+    inpE = document.getElementById('inpEnd');
+  var end = Number(inpE.value) || 0;
+  inpS.value = next;
+  if (end < next) inpE.value = Math.min(next + 99, Math.max.apply(null, words.map(function (w) {
+    return Number(w.n);
+  })));
+  document.getElementById('selQuickRange').value = '';
+  startApp('card');
 }
 function syncFetchInk(n) {
   var key = cloudKey();
@@ -1867,6 +1936,7 @@ function goHome() {
   stopAllAudio();
   isPaused = true;
   showScreen('screen-setup');
+  renderResume();
   syncFlush();
   syncPull();
 }
@@ -1926,6 +1996,7 @@ function renderCard() {
   }
   var item = studyQueue[currentIndex];
   var status = getStatus(item.n);
+  posMark(item.n);
   document.getElementById('progress-text').innerText = currentIndex + 1 + " / " + studyQueue.length + " (No." + item.n + ")";
   document.getElementById('txt-word').innerText = item.w;
   document.getElementById('txt-meaning').innerText = item.m;
