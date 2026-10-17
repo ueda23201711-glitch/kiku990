@@ -1,7 +1,8 @@
 {
+  "id": "/kiku990/?app=kikutan-toeic990",
   "name": "キクタンTOEIC990",
   "short_name": "TOEIC990",
-  "start_url": "./",
+  "start_url": "./?source=pwa",
   "scope": "./",
   "display": "standalone",
   "background_color": "#802028",
