@@ -1482,11 +1482,7 @@ function syncFetchInk(n) {
         syncMeta.ink[n] = v.t || 1; delete inkStale[n]; syncSave();
         if (syncCurrentN() === n && canvas) {
             clearCanvasPixels();
-            if (v.v) {
-                const img = new Image();
-                img.onload = () => { ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.drawImage(img, 0, 0, canvas.width, canvas.height); ctx.restore(); };
-                img.src = v.v;
-            }
+            if (v.v) showInk(v.v);
         }
     });
 }
@@ -1898,18 +1894,7 @@ function loadNotesFor(n){
                 resizeCanvasToDisplaySize();
         clearCanvasPixels();
         const ink = localStorage.getItem(memoInkKey(n));
-        if (ink) {
-            const img = new Image();
-            img.onload = () => {
-                ctx.save();
-                ctx.setTransform(1,0,0,1,0,0);
-                ctx.globalAlpha = 1;
-                ctx.globalCompositeOperation = 'source-over';
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                ctx.restore();
-            };
-            img.src = ink;
-        }
+        if (ink) showInk(ink);
     });
 }
 
@@ -1946,6 +1931,51 @@ function adjustCanvasHeightForPhone(){
 }
 
 
+/* ===== 手書きの「ページ」 =====
+   手書きは描いた端末の大きさ・縦横比のまま page に保存する。
+   画面（canvas）には page 全体をゆがめずに収めて表示し、余白は薄いグレーにする。
+   画面で描いた線は、同じ位置に page にも描く（保存するのは page）。 */
+let page = null, pageCtx = null, view = { s: 1, ox: 0, oy: 0 };
+function newPage(w, h) {
+    page = document.createElement('canvas');
+    page.width = Math.max(1, w); page.height = Math.max(1, h);
+    pageCtx = page.getContext('2d');
+    pageCtx.fillStyle = '#ffffff';
+    pageCtx.fillRect(0, 0, page.width, page.height);
+}
+function computeView() {
+    const s = Math.min(canvas.width / page.width, canvas.height / page.height);
+    view = { s: s, ox: Math.round((canvas.width - page.width * s) / 2), oy: 0 };
+}
+function renderPage() {
+    if (!page) return;
+    const w = page.width * view.s, h = page.height * view.s;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.shadowBlur = 0;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (Math.round(w) < canvas.width || Math.round(h) < canvas.height) {
+        ctx.fillStyle = '#e9edf0';            // ページの外（描けない部分）
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(view.ox, view.oy, w, h);
+    ctx.drawImage(page, view.ox, view.oy, w, h);
+    ctx.restore();
+}
+function pageFromImage(img) {
+    newPage(img.naturalWidth || img.width, img.naturalHeight || img.height);
+    page.native = false;                       // ほかの端末（大きさ違い）で描かれたページ
+    pageCtx.drawImage(img, 0, 0);
+    computeView();
+    renderPage();
+}
+function showInk(dataUrl) {
+    const img = new Image();
+    img.onload = () => pageFromImage(img);
+    img.src = dataUrl;
+}
+
 function resizeCanvasToDisplaySize(){
     const dpr = window.devicePixelRatio || 1;
     canvasDpr = dpr;
@@ -1954,24 +1984,24 @@ function resizeCanvasToDisplaySize(){
     const newW = Math.max(1, Math.round(rect.width * dpr));
     const newH = Math.max(1, Math.round(rect.height * dpr));
     if (canvas.width !== newW || canvas.height !== newH) {
-        const old = document.createElement('canvas');
-        old.width = canvas.width;
-        old.height = canvas.height;
-        old.getContext('2d').drawImage(canvas, 0, 0);
-
         canvas.width = newW;
         canvas.height = newH;
-        ctx.drawImage(old, 0, 0, old.width, old.height, 0, 0, canvas.width, canvas.height);
+        if (page && page.native) {
+            // この端末で描いたページは、画面の大きさに合わせて作り直す
+            const old = page;
+            newPage(newW, newH); page.native = true;
+            pageCtx.drawImage(old, 0, 0, old.width, old.height, 0, 0, newW, newH);
+        }
+        if (page) { computeView(); renderPage(); }
     }
 }
 
 function clearCanvasPixels(){
-    ctx.save();
-    ctx.setTransform(1,0,0,1,0,0);
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0,0,canvas.width,canvas.height);
-    ctx.restore();
+    // 白紙のページ（この端末の画面の大きさ）にする
+    newPage(canvas.width, canvas.height);
+    page.native = true;
+    computeView();
+    renderPage();
 }
 
 function screenToCanvasPoint(e){
@@ -2023,62 +2053,76 @@ function currentLineWidth(){
     return v;
 }
 
-function applyToolStyle(){
-    const lw = currentLineWidth();
-    ctx.lineWidth = lw;
-    ctx.lineJoin = 'round';
-    ctx.shadowBlur = 0;
-    ctx.shadowColor = 'transparent';
+function applyToolStyle(c, k){
+    c = c || ctx; k = k || 1;   // c: 描く先、k: 線の太さの倍率（ページの縮尺に合わせる）
+    const lw = currentLineWidth() * k;
+    c.lineWidth = lw;
+    c.lineJoin = 'round';
+    c.shadowBlur = 0;
+    c.shadowColor = 'transparent';
 
     if (currentTool === 'eraser'){
-        ctx.lineCap = 'round';
-        ctx.globalCompositeOperation = 'destination-out';
-        ctx.globalAlpha = 1.0;
-        ctx.strokeStyle = 'rgba(0,0,0,1)';
-        ctx.fillStyle = 'rgba(0,0,0,1)';
+        c.lineCap = 'round';
+        c.globalCompositeOperation = 'destination-out';
+        c.globalAlpha = 1.0;
+        c.strokeStyle = 'rgba(0,0,0,1)';
+        c.fillStyle = 'rgba(0,0,0,1)';
         return;
     }
 
     if (currentTool === 'highlighter'){
         // Marker-like: semi-transparent paint on top (not multiply),
         // with a flatter tip feel.
-        ctx.lineCap = 'butt';
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.globalAlpha = 0.22;
-        ctx.strokeStyle = currentColor;
-        ctx.fillStyle = currentColor;
+        c.lineCap = 'butt';
+        c.globalCompositeOperation = 'source-over';
+        c.globalAlpha = 0.22;
+        c.strokeStyle = currentColor;
+        c.fillStyle = currentColor;
 
         // tiny softness at edges
-        ctx.shadowBlur = Math.max(0, lw * 0.08);
-        ctx.shadowColor = currentColor;
+        c.shadowBlur = Math.max(0, lw * 0.08);
+        c.shadowColor = currentColor;
         return;
     }
 
     // normal pen
-    ctx.lineCap = 'round';
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.globalAlpha = 1.0;
-    ctx.strokeStyle = currentColor;
-    ctx.fillStyle = currentColor;
+    c.lineCap = 'round';
+    c.globalCompositeOperation = 'source-over';
+    c.globalAlpha = 1.0;
+    c.strokeStyle = currentColor;
+    c.fillStyle = currentColor;
+}
+
+// 画面とページの両方に同じ線を描く
+function drawBoth(fn){
+    if (!page) clearCanvasPixels();
+    const w = page.width * view.s, h = page.height * view.s;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(view.ox, view.oy, w, h); ctx.clip();   // ページの外には描かない
+    applyToolStyle(ctx, 1);
+    fn(ctx, x => x, y => y);
+    ctx.restore();
+    pageCtx.save();
+    applyToolStyle(pageCtx, 1 / view.s);
+    fn(pageCtx, x => (x - view.ox) / view.s, y => (y - view.oy) / view.s);
+    pageCtx.restore();
 }
 
 function drawDot(x,y){
-    ctx.save();
-    applyToolStyle();
-    ctx.beginPath();
-    ctx.arc(x, y, ctx.lineWidth/2, 0, Math.PI*2);
-    ctx.fill();
-    ctx.restore();
+    drawBoth((c, X, Y) => {
+        c.beginPath();
+        c.arc(X(x), Y(y), c.lineWidth/2, 0, Math.PI*2);
+        c.fill();
+    });
 }
 
 function drawLine(x1,y1,x2,y2){
-    ctx.save();
-    applyToolStyle();
-    ctx.beginPath();
-    ctx.moveTo(x1,y1);
-    ctx.lineTo(x2,y2);
-    ctx.stroke();
-    ctx.restore();
+    drawBoth((c, X, Y) => {
+        c.beginPath();
+        c.moveTo(X(x1), Y(y1));
+        c.lineTo(X(x2), Y(y2));
+        c.stroke();
+    });
     scheduleInkSave();
 }
 
@@ -2088,7 +2132,7 @@ function scheduleInkSave(immediate=false){
     clearTimeout(drawSaveTimer);
     const doSave = () => {
         try{
-            const dataUrl = canvas.toDataURL('image/png');
+            const dataUrl = (page || canvas).toDataURL('image/png');
             localStorage.setItem(memoInkKey(n), dataUrl);
             syncMark('ink', String(n));
         }catch(err){
