@@ -1858,13 +1858,16 @@ function resumeStudy() {
   if (!next) return;
   var inpS = document.getElementById('inpStart'),
     inpE = document.getElementById('inpEnd');
-  var end = Number(inpE.value) || 0;
-  inpS.value = next;
-  if (end < next) inpE.value = Math.min(next + 99, Math.max.apply(null, words.map(function (w) {
+  var maxN = Math.max.apply(null, words.map(function (w) {
     return Number(w.n);
-  })));
+  }));
+  var start = Number(inpS.value) || 1,
+    end = Number(inpE.value) || 0;
+  // 学習範囲の開始は元のまま（前のカードに戻れるように）。続きが範囲外なら広げる
+  if (start > next) inpS.value = Math.floor((next - 1) / 100) * 100 + 1;
+  if (end < next) inpE.value = Math.min(next + 99, maxN);
   document.getElementById('selQuickRange').value = '';
-  startApp('card');
+  startApp('card', next);
 }
 function syncFetchInk(n) {
   var key = cloudKey();
@@ -1976,7 +1979,7 @@ function saveStatus(n, status) {
   localStorage.setItem(k('stat_' + n), JSON.stringify(status));
   syncMark('st', String(n));
 }
-function startApp(mode) {
+function startApp(mode, startAtN) {
   stopAllAudio();
   var startNum = Number(document.getElementById('inpStart').value.trim()) || 1;
   var endNum = Number(document.getElementById('inpEnd').value.trim()) || 9999;
@@ -1995,6 +1998,13 @@ function startApp(mode) {
     return;
   }
   currentIndex = 0;
+  if (startAtN) {
+    // 「続きから」：範囲の最初からではなく、続きのカードを最初に表示（前のカードにも戻れる）
+    var idx = studyQueue.findIndex(function (item) {
+      return Number(item.n) >= Number(startAtN);
+    });
+    if (idx > 0) currentIndex = idx;
+  }
   isListeningMode = mode === 'listen';
   isPaused = false;
   document.getElementById('controls-card').className = isListeningMode ? 'hidden' : '';

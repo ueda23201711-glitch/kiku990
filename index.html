@@ -1462,11 +1462,13 @@ function resumeStudy() {
     const next = resumeNext();
     if (!next) return;
     const inpS = document.getElementById('inpStart'), inpE = document.getElementById('inpEnd');
-    const end = Number(inpE.value) || 0;
-    inpS.value = next;
-    if (end < next) inpE.value = Math.min(next + 99, Math.max.apply(null, words.map(w => Number(w.n))));
+    const maxN = Math.max.apply(null, words.map(w => Number(w.n)));
+    const start = Number(inpS.value) || 1, end = Number(inpE.value) || 0;
+    // 学習範囲の開始は元のまま（前のカードに戻れるように）。続きが範囲外なら広げる
+    if (start > next) inpS.value = Math.floor((next - 1) / 100) * 100 + 1;
+    if (end < next) inpE.value = Math.min(next + 99, maxN);
     document.getElementById('selQuickRange').value = '';
-    startApp('card');
+    startApp('card', next);
 }
 
 function syncFetchInk(n) {
@@ -1547,7 +1549,7 @@ function saveStatus(n, status) {
     syncMark('st', String(n));
 }
 
-function startApp(mode) {
+function startApp(mode, startAtN) {
     stopAllAudio();
     const startNum = Number(document.getElementById('inpStart').value.trim()) || 1;
     const endNum = Number(document.getElementById('inpEnd').value.trim()) || 9999;
@@ -1569,6 +1571,11 @@ function startApp(mode) {
     }
 
     currentIndex = 0;
+    if (startAtN) {
+        // 「続きから」：範囲の最初からではなく、続きのカードを最初に表示（前のカードにも戻れる）
+        const idx = studyQueue.findIndex(item => Number(item.n) >= Number(startAtN));
+        if (idx > 0) currentIndex = idx;
+    }
     isListeningMode = (mode === 'listen');
     isPaused = false;
     document.getElementById('controls-card').className = isListeningMode ? 'hidden' : '';
