@@ -37,7 +37,7 @@ SERIES = {
     },
 }
 
-SW_VERSION = 'v10'
+SW_VERSION = 'v11'
 
 
 def must_replace(s, old, new, label, count=None):
@@ -79,7 +79,7 @@ self.addEventListener("install", (event) => {{
 self.addEventListener("activate", (event) => {{
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith("{cfg['cache']}-") && k !== CACHE_NAME).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 }});
@@ -101,6 +101,12 @@ self.addEventListener("fetch", (event) => {{
         }})
         .catch(() => caches.match(req).then((c) => c || caches.match("./index.html")))
     );
+    return;
+  }}
+
+  // アプリ情報（manifest）はネット優先：古い情報でインストールされないように
+  if (new URL(req.url).pathname.endsWith("manifest.webmanifest")) {{
+    event.respondWith(fetch(req, {{ cache: "no-cache" }}).catch(() => caches.match(req)));
     return;
   }}
 
