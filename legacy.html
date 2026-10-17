@@ -1118,6 +1118,7 @@ function setupNotesUI() {
     clearTimeout(memoSaveTimer);
     memoSaveTimer = setTimeout(function () {
       localStorage.setItem(memoTextKey(n), document.getElementById('note-text').value);
+      syncMark('tx', String(n));
     }, 250);
   });
   highlightActiveSwatch();
@@ -1360,7 +1361,7 @@ function cloudPush(cb) {
     return;
   }
   var t = Date.now();
-  cloudReq('PUT', '/memos/' + key + '/kiku', {
+  cloudReq('PATCH', '/memos/' + key + '/kiku', {
     words: masterTsv.trim(),
     updated: t
   }, function (err) {
@@ -1388,7 +1389,35 @@ function cloudPull(manual) {
   }
   renderCloudPanel();
   if (manual) cloudSetMsg('読み込み中…', true);
-  cloudReq('GET', '/memos/' + key + '/kiku', undefined, function (err, data) {
+  // 理解度や手書きまで一緒に読まないよう、単語リストの更新日時だけ先に確認する
+  cloudReq('GET', '/memos/' + key + '/kiku/updated', undefined, function (err, updated) {
+    if (err) {
+      cloudPullDone(err, null, manual);
+      return;
+    }
+    if (!updated) {
+      cloudPullDone(null, null, manual);
+      return;
+    }
+    var localUpdated = Number(lsGet('cloud_updated') || 0);
+    if (!manual && cloudWordCount() && updated <= localUpdated) {
+      cloudPullDone(null, {
+        words: masterTsv,
+        updated: updated,
+        same: true
+      }, manual);
+      return;
+    }
+    cloudReq('GET', '/memos/' + key + '/kiku/words', undefined, function (e2, w) {
+      cloudPullDone(e2, w ? {
+        words: w,
+        updated: updated
+      } : null, manual);
+    });
+  });
+}
+function cloudPullDone(err, data, manual) {
+  {
     if (err) {
       renderCloudPanel();
       // 合言葉が違う（ルールで拒否）ときは、入力し直せるようにする
@@ -1397,8 +1426,7 @@ function cloudPull(manual) {
       return;
     }
     if (data && data.words) {
-      var localUpdated = Number(lsGet('cloud_updated') || 0);
-      if (manual || !cloudWordCount() || (data.updated || 0) > localUpdated) applyWords(data.words, data.updated);
+      if (!data.same) applyWords(data.words, data.updated);
       renderCloudPanel();
       cloudSetMsg('クラウドの単語データを使っています（' + cloudWordCount() + '語）。', true);
       return;
@@ -1413,13 +1441,14 @@ function cloudPull(manual) {
       renderCloudPanel();
       cloudSetMsg('クラウドに単語データがまだありません。単語データのある端末でこの画面を開いてください。');
     }
-  });
+  }
 }
 function cloudUseKey(key) {
   if (cloudKey() && cloudKey() !== key && !confirm('合言葉を切り替えますか？（手書きメモと同じ合言葉にしてください）')) return;
   setCloudKey(key);
   cloudSetMsg('');
   cloudPull(true);
+  syncPull();
 }
 function cloudUseKeyInput() {
   var key = cloudNormKey(document.getElementById('cloud-key-in').value);
@@ -1570,6 +1599,226 @@ function cloudStartScan() {
   });
 }
 
+/* ===== 理解度・カードのメモ（テキスト・手書き）の共有 =====
+   クラウド: memos/合言葉/kiku/st/番号 = {level, result, t}
+                              tx/番号 = {v: 文字, t}
+                              ink/番号 = {v: 画像, t}（大きいので inkT/番号 = t だけ先に見る）
+   t は最後に変えた時刻。新しい方を残す。 */
+function syncLoad(name, def) {
+  try {
+    var v = JSON.parse(lsGet(name) || 'null');
+    return v || def;
+  } catch (e) {
+    return def;
+  }
+}
+var syncMeta = syncLoad('sync_meta', {
+  st: {},
+  tx: {},
+  ink: {}
+}); // 端末側の各記録の時刻
+var syncDirty = syncLoad('sync_dirty', {}); // 未送信 "st/12": 時刻
+var inkStale = syncLoad('sync_ink_stale', {}); // 他端末で更新された手書き 番号: 時刻
+['st', 'tx', 'ink'].forEach(function (t) {
+  if (!syncMeta[t]) syncMeta[t] = {};
+});
+var syncTimer = null,
+  syncBusy = false,
+  syncPulling = false;
+function syncSave() {
+  try {
+    lsSet('sync_meta', JSON.stringify(syncMeta));
+    lsSet('sync_dirty', JSON.stringify(syncDirty));
+    lsSet('sync_ink_stale', JSON.stringify(inkStale));
+  } catch (e) {}
+}
+function syncMark(type, n) {
+  var t = Date.now();
+  syncMeta[type][n] = t;
+  syncDirty[type + '/' + n] = t;
+  if (type === 'ink') delete inkStale[n];
+  syncSave();
+  syncSchedule(1500);
+}
+function syncSchedule(ms) {
+  if (!cloudKey()) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(syncFlush, ms);
+}
+function syncPayload(type, n, t) {
+  if (type === 'st') {
+    var s = getStatus(n);
+    return {
+      level: Number(s.level) || 0,
+      result: s.result || 'new',
+      t: t
+    };
+  }
+  if (type === 'tx') return {
+    v: localStorage.getItem(memoTextKey(n)) || '',
+    t: t
+  };
+  return {
+    v: localStorage.getItem(memoInkKey(n)) || '',
+    t: t
+  };
+}
+function syncFlush() {
+  var key = cloudKey();
+  if (!key || syncBusy) return;
+  var ids = Object.keys(syncDirty);
+  if (!ids.length) return;
+  var body = {},
+    sent = {};
+  var size = 0;
+  for (var i = 0; i < ids.length; i++) {
+    var id = ids[i],
+      parts = id.split('/'),
+      type = parts[0],
+      n = parts[1],
+      t = syncDirty[id];
+    var p = syncPayload(type, n, t);
+    body[id] = p;
+    if (type === 'ink') body['inkT/' + n] = t;
+    sent[id] = t;
+    size += p.v ? p.v.length : 60;
+    if (size > 1500000) break; // 手書きが多いときは分けて送る
+  }
+  syncBusy = true;
+  cloudReq('PATCH', '/memos/' + key + '/kiku', body, function (err) {
+    syncBusy = false;
+    if (err) {
+      syncSchedule(20000);
+      return;
+    }
+    Object.keys(sent).forEach(function (id) {
+      if (syncDirty[id] === sent[id]) delete syncDirty[id];
+    });
+    syncSave();
+    if (Object.keys(syncDirty).length) syncSchedule(300);
+  });
+}
+function syncEach(data, fn) {
+  if (!data || typeof data !== 'object') return;
+  Object.keys(data).forEach(function (n) {
+    if (data[n] !== null && data[n] !== undefined) fn(String(n), data[n]);
+  });
+}
+function syncCurrentN() {
+  var onStudy = document.getElementById('screen-study').classList.contains('active');
+  return onStudy && studyQueue[currentIndex] ? String(studyQueue[currentIndex].n) : null;
+}
+function syncPull(done) {
+  var key = cloudKey();
+  if (!key || syncPulling) {
+    if (done) done(false);
+    return;
+  }
+  syncPulling = true;
+  var srv = {};
+  var pending = 3;
+  ['st', 'tx', 'inkT'].forEach(function (name) {
+    cloudReq('GET', '/memos/' + key + '/kiku/' + name, undefined, function (err, data) {
+      srv[name] = err ? null : data || {};
+      if (--pending === 0) {
+        syncPulling = false;
+        syncMerge(srv);
+        if (done) done(true);
+      }
+    });
+  });
+}
+function syncMerge(srv) {
+  if (!srv.st || !srv.tx || !srv.inkT) return; // 通信できなかった
+  var cur = syncCurrentN();
+  var changed = false;
+  syncEach(srv.st, function (n, v) {
+    if (syncDirty['st/' + n] || (v.t || 0) <= (syncMeta.st[n] || 0)) return;
+    localStorage.setItem(k('stat_' + n), JSON.stringify({
+      level: Number(v.level) || 0,
+      result: v.result || 'new'
+    }));
+    syncMeta.st[n] = v.t;
+    changed = true;
+  });
+  syncEach(srv.tx, function (n, v) {
+    if (syncDirty['tx/' + n] || (v.t || 0) <= (syncMeta.tx[n] || 0)) return;
+    if (v.v) localStorage.setItem(memoTextKey(n), v.v);else localStorage.removeItem(memoTextKey(n));
+    syncMeta.tx[n] = v.t;
+    var ta = document.getElementById('note-text');
+    if (n === cur && document.activeElement !== ta) ta.value = v.v || '';
+  });
+  syncEach(srv.inkT, function (n, t) {
+    if (syncDirty['ink/' + n] || (t || 0) <= (syncMeta.ink[n] || 0)) return;
+    inkStale[n] = t;
+    if (n === cur) syncFetchInk(n);
+  });
+  // 共有を始める前からこの端末にある記録で、クラウドにまだ無いものを送る
+  for (var i = 0; i < localStorage.length; i++) {
+    var name = localStorage.key(i) || '';
+    if (name.indexOf(APP_PREFIX) !== 0) continue;
+    var m = name.slice(APP_PREFIX.length).match(/^(stat|memo_text|memo_ink)_(\d+)$/);
+    if (!m) continue;
+    var type = m[1] === 'stat' ? 'st' : m[1] === 'memo_text' ? 'tx' : 'ink',
+      n = m[2];
+    if (syncMeta[type][n]) continue;
+    var onServer = type === 'st' ? srv.st[n] : type === 'tx' ? srv.tx[n] : srv.inkT[n];
+    if (onServer) continue;
+    syncMeta[type][n] = 1;
+    syncDirty[type + '/' + n] = 1; // 時刻1＝どの新しい記録にも負ける
+  }
+  syncSave();
+  if (changed) {
+    refreshMainStats();
+    if (cur) {
+      var st = getStatus(cur);
+      document.getElementById('badge-lv').innerText = 'LV.' + st.level;
+      document.querySelectorAll('.level-btn').forEach(function (btn, idx) {
+        return btn.classList.toggle('active', idx + 1 == st.level);
+      });
+    }
+    if (document.getElementById('screen-list').classList.contains('active')) renderListTable();
+  }
+  if (Object.keys(syncDirty).length) syncSchedule(500);
+}
+function syncFetchInk(n) {
+  var key = cloudKey();
+  if (!key) return;
+  cloudReq('GET', '/memos/' + key + '/kiku/ink/' + n, undefined, function (err, v) {
+    if (err || !v) return;
+    if (syncDirty['ink/' + n] || isDrawing) return; // 書いている途中なら上書きしない
+    try {
+      if (v.v) localStorage.setItem(memoInkKey(n), v.v);else localStorage.removeItem(memoInkKey(n));
+    } catch (e) {
+      return;
+    }
+    syncMeta.ink[n] = v.t || 1;
+    delete inkStale[n];
+    syncSave();
+    if (syncCurrentN() === n && canvas) {
+      clearCanvasPixels();
+      if (v.v) {
+        var img = new Image();
+        img.onload = function () {
+          ctx.save();
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.globalAlpha = 1;
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          ctx.restore();
+        };
+        img.src = v.v;
+      }
+    }
+  });
+}
+document.addEventListener('visibilitychange', function () {
+  if (document.hidden) syncFlush();else syncPull();
+});
+setInterval(function () {
+  if (!document.hidden) syncPull();
+}, 60000);
+
 /* ---- #k=… 付きで開かれたとき（カメラアプリでQRを読んだ場合など） ---- */
 function cloudKeyFromHash() {
   if (!/[#&]k=/.test(location.hash)) return null;
@@ -1593,7 +1842,10 @@ function cloudInit() {
     }
   }
   renderCloudPanel();
-  if (cloudKey()) cloudPull(false);
+  if (cloudKey()) {
+    cloudPull(false);
+    syncPull();
+  }
 }
 window.addEventListener('hashchange', function () {
   var hk = cloudKeyFromHash();
@@ -1615,6 +1867,8 @@ function goHome() {
   stopAllAudio();
   isPaused = true;
   showScreen('screen-setup');
+  syncFlush();
+  syncPull();
 }
 function stopAllAudio() {
   if (listenTimer) {
@@ -1634,6 +1888,7 @@ function getStatus(n) {
 }
 function saveStatus(n, status) {
   localStorage.setItem(k('stat_' + n), JSON.stringify(status));
+  syncMark('st', String(n));
 }
 function startApp(mode) {
   stopAllAudio();
@@ -2009,6 +2264,7 @@ function handleSwipe() {
 function loadNotesFor(n) {
   var text = localStorage.getItem(memoTextKey(n)) || '';
   document.getElementById('note-text').value = text;
+  if (inkStale[String(n)]) syncFetchInk(String(n));
   requestAnimationFrame(function () {
     adjustCanvasHeightForPhone();
     enforceToolbarLayout();
@@ -2202,6 +2458,7 @@ function scheduleInkSave(immediate) {
     try {
       var dataUrl = canvas.toDataURL('image/png');
       localStorage.setItem(memoInkKey(n), dataUrl);
+      syncMark('ink', String(n));
     } catch (err) {
       // ignore quota errors
     }
@@ -2262,6 +2519,7 @@ function clearCanvas(e) {
   var n = studyQueue[currentIndex].n;
   clearCanvasPixels();
   localStorage.removeItem(memoInkKey(n));
+  syncMark('ink', String(n));
 }
 function clearAllNotes(e) {
   if (e) {
@@ -2273,6 +2531,7 @@ function clearAllNotes(e) {
   if (!confirm('このカードの「文字メモ」と「手書きメモ」を全て消します。よろしいですか？')) return;
   document.getElementById('note-text').value = '';
   localStorage.removeItem(memoTextKey(n));
+  syncMark('tx', String(n));
   clearCanvas(e);
 }
 
