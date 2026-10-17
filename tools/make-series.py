@@ -29,6 +29,12 @@ SERIES = {
         'title': 'キクタンSuper12000', 'short': 'Super12000', 'color': '#356EA6',
         'prefix': 'kikutan_super12000__', 'node': 'kiku12000', 'cache': 'kikutan-super12000',
     },
+    'kiku-my': {
+        'title': 'My単語帳', 'short': 'My単語帳', 'color': '#B05A16',
+        'prefix': 'kikutan_my__', 'node': 'myvocab', 'cache': 'kikutan-my',
+        # 英文リーダー（手書きメモ）で保存した単語・熟語の単語帳。アプリ情報（manifest）もここで作る
+        'manifest': True, 'repo': 'kiku-my',
+    },
     'kiku800': {
         'title': 'キクタンTOEIC800', 'short': 'TOEIC800', 'color': '#407C42',
         'prefix': 'kikutan_toeic800_', 'node': 'kiku800', 'cache': 'kikutan-toeic800',
@@ -63,8 +69,23 @@ def make_index(cfg, data):
     return s
 
 
+def manifest_name(repo):
+    return 'app-v2.webmanifest' if os.path.exists(os.path.join(repo, 'app-v2.webmanifest')) else 'manifest.webmanifest'
+
+
+def make_manifest(cfg):
+    icons = [{'src': './icons/icon-192.png', 'sizes': '192x192', 'type': 'image/png'},
+             {'src': './icons/icon-512.png', 'sizes': '512x512', 'type': 'image/png'},
+             {'src': './icons/maskable-192.png', 'sizes': '192x192', 'type': 'image/png', 'purpose': 'maskable'},
+             {'src': './icons/maskable-512.png', 'sizes': '512x512', 'type': 'image/png', 'purpose': 'maskable'}]
+    return json.dumps({'id': '/' + cfg['repo'] + '/?app=' + cfg['cache'], 'name': cfg['title'], 'short_name': cfg['short'],
+                       'start_url': './?source=pwa', 'scope': './', 'display': 'standalone',
+                       'background_color': cfg['color'], 'theme_color': cfg['color'], 'icons': icons},
+                      ensure_ascii=False, indent=2) + '\n'
+
+
 def make_sw(cfg, repo):
-    assets = ['./', './index.html', './manifest.webmanifest']
+    assets = ['./', './index.html', './' + manifest_name(repo)]
     for f in ['apple-touch-icon-180.png', 'favicon-32.png', 'favicon-16.png']:
         if os.path.exists(os.path.join(repo, 'icons', f)):
             assets.append('./icons/' + f)
@@ -122,7 +143,13 @@ def main():
     name, repo = sys.argv[1], os.path.abspath(sys.argv[2])
     data = open(sys.argv[3], encoding='utf-8').read().strip('\n') if len(sys.argv) > 3 else None
     cfg = SERIES[name]
-    open(os.path.join(repo, 'index.html'), 'w', encoding='utf-8').write(make_index(cfg, data))
+    if cfg.get('manifest'):
+        open(os.path.join(repo, 'app-v2.webmanifest'), 'w', encoding='utf-8').write(make_manifest(cfg))
+    idx = make_index(cfg, data)
+    # ひな形（kiku990）は app-v2.webmanifest を読む。出力先にそれが無ければ元の名前に戻す
+    if manifest_name(repo) != 'app-v2.webmanifest':
+        idx = idx.replace('./app-v2.webmanifest', './manifest.webmanifest')
+    open(os.path.join(repo, 'index.html'), 'w', encoding='utf-8').write(idx)
     open(os.path.join(repo, 'sw.js'), 'w', encoding='utf-8').write(make_sw(cfg, repo))
     ipad = open(os.path.join(ROOT, 'ipad.html'), encoding='utf-8').read().replace('キクタンTOEIC990', cfg['title'])
     ipad = re.sub('#802028', cfg['color'], ipad, flags=re.I)
