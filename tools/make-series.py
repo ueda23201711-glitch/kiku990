@@ -105,7 +105,7 @@ self.addEventListener("fetch", (event) => {{
   }}
 
   // アプリ情報（manifest）はネット優先：古い情報でインストールされないように
-  if (new URL(req.url).pathname.endsWith("manifest.webmanifest")) {{
+  if (new URL(req.url).pathname.endsWith(".webmanifest")) {{
     event.respondWith(fetch(req, {{ cache: "no-cache" }}).catch(() => caches.match(req)));
     return;
   }}

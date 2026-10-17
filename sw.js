@@ -1,8 +1,8 @@
-const CACHE_NAME = "kikutan-toeic990-v7";
+const CACHE_NAME = "kikutan-toeic990-v8";
 const ASSETS = [
   "./",
   "./index.html",
-  "./manifest.webmanifest",
+  "./app-v2.webmanifest",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/apple-touch-icon-180.png",
@@ -46,7 +46,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   // アプリ情報（manifest）はネット優先：古い情報でインストールされないように
-  if (new URL(req.url).pathname.endsWith("manifest.webmanifest")) {
+  if (new URL(req.url).pathname.endsWith(".webmanifest")) {
     event.respondWith(fetch(req, { cache: "no-cache" }).catch(() => caches.match(req)));
     return;
   }
