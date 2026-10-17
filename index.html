@@ -699,6 +699,7 @@
             <div class="note-area" id="note-area">
                 <div class="note-title">
                     <span>このカードのメモ</span>
+                    <button class="tool-btn" id="note-say" style="padding:6px 10px; display:none" onclick="playNoteEnglish(event)" title="メモの中の英文（例文）を読み上げる">🔊 例文</button>
                     <button class="tool-btn" style="padding:6px 10px" onclick="clearAllNotes(event)" title="文字メモと手書きメモを全消し">全消し</button>
                 </div>
 
@@ -1655,6 +1656,26 @@ function revealMeaning(callback) {
     } else if (callback) {
         callback();
     }
+}
+
+// カードのメモにある英文（「例文: …」の行、なければ英語の行）を取り出す
+function noteEnglish() {
+    const ta = document.getElementById('note-text');
+    const t = ta ? String(ta.value || '') : '';
+    const m = t.match(/例文\s*[:：]\s*([^\n]+)/);
+    if (m) return m[1].trim();
+    const lines = t.split('\n').filter(l => (l.match(/[A-Za-z]/g) || []).length >= 8 && (l.match(/[A-Za-z]/g) || []).length > l.length * 0.5);
+    return lines.join(' ').trim();
+}
+function updateNoteSayButton() {
+    const b = document.getElementById('note-say');
+    if (b) b.style.display = noteEnglish() ? '' : 'none';
+}
+setInterval(updateNoteSayButton, 800);
+function playNoteEnglish(e) {
+    if (e) { e.stopPropagation(); e.preventDefault(); }
+    const t = noteEnglish();
+    if (t) speak(t, 'en-US');
 }
 
 let lastPlayWordAt = 0;

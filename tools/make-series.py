@@ -34,6 +34,14 @@ SERIES = {
         'prefix': 'kikutan_my__', 'node': 'myvocab', 'cache': 'kikutan-my',
         # 英文リーダー（手書きメモ）で保存した単語・熟語の単語帳。アプリ情報（manifest）もここで作る
         'manifest': True, 'repo': 'kiku-my',
+        # 英文リーダー（独立アプリ）と同じ、ほかとは別の合言葉を使う
+        'keyname': 'eibun_key', 'pair_app': '英文リーダー',
+    },
+    'kiku-memo': {
+        'title': 'メモ単語帳', 'short': 'メモ単語帳', 'color': '#2E7D6B',
+        'prefix': 'kikutan_memo__', 'node': 'memovocab', 'cache': 'kikutan-memo',
+        # 手書きメモの中の英文リーダーで保存した単語・熟語の単語帳（合言葉は手書きメモと同じ）
+        'manifest': True, 'repo': 'kiku-memo',
     },
     'kiku800': {
         'title': 'キクタンTOEIC800', 'short': 'TOEIC800', 'color': '#407C42',
@@ -62,6 +70,17 @@ def make_index(cfg, data):
     s = must_replace(s, "const CLOUD_NODE = 'kiku';", f"const CLOUD_NODE = '{cfg['node']}';", 'node', 1)
     if cfg.get('marker'):
         s = must_replace(s, 'const marker = k("__migrated_v1");', f'const marker = k("{cfg["marker"]}");', 'marker', 1)
+    if cfg.get('keyname'):
+        # 合言葉の置き場所（localStorage のキー）を変える
+        s = must_replace(s, "localStorage.getItem('memo_key')", "localStorage.getItem('" + cfg['keyname'] + "')", 'keyname get', 1)
+        s = must_replace(s, "localStorage.setItem('memo_key', key)", "localStorage.setItem('" + cfg['keyname'] + "', key)", 'keyname set', 1)
+        app = cfg.get('pair_app', '手書きメモ')
+        for old, new in [('手書きメモの「設定」→「ほかの端末を追加」に出るQRコードかペアリングコード', app + 'の「⚙ 設定」に出るペアリングコード'),
+                         ('手書きメモの「設定」に表示されたQRコード', app + 'の合言葉のQRコード'),
+                         ('（手書きメモと同じ合言葉にしてください）', '（' + app + 'と同じ合言葉にしてください）'),
+                         ('手書きメモでもう一度表示してください', app + 'でもう一度表示してください'),
+                         ('このQRコードは手書きメモの合言葉ではありません', 'このQRコードは' + app + 'の合言葉ではありません')]:
+            s = must_replace(s, old, new, 'pair text: ' + old[:12])
     if data is not None:
         if '`' in data or '${' in data:
             raise SystemExit('単語データに ` または ${ が含まれています')
