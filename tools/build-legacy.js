@@ -166,7 +166,9 @@ html = html.replace('iPhoneの「設定」→「アクセシビリティ」→�
 
 // ホーム画面に追加したとき全画面で開くように
 html = mustReplace(html, '<meta charset="UTF-8">',
-    '<meta charset="UTF-8">\n<meta name="apple-mobile-web-app-capable" content="yes">\n<!-- このファイルは tools/build-legacy.js で index.html から自動生成しています。直接編集しないでください。 -->',
+    '<meta charset="UTF-8">\n<meta name="apple-mobile-web-app-capable" content="yes">\n<!-- このファイルは tools/build-legacy.js で index.html から自動生成しています。直接編集しないでください。 -->\n' +
+    '<script>/* ホーム画面から開いたときは、毎回違うアドレスで読み直して古い保存内容を使わせない */\n' +
+    'if (window.navigator.standalone === true && !/[?&]v=/.test(location.search)) { location.replace(location.pathname + "?v=" + new Date().getTime() + location.hash); }</script>',
     'meta');
 
 fs.writeFileSync(path.join(root, 'legacy.html'), html);

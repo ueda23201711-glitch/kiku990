@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="キクタンTOEIC990">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon-180.png">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon-180.png">
+<title>キクタンTOEIC990</title>
+<!--
+  古い iPad（iOS 9）のホーム画面用の入り口。
+  ホーム画面のアプリは古いページを持ち続けることがあるため、
+  ここから毎回違うアドレス（?v=時刻）で legacy.html を開き、必ず最新版を読み込む。
+-->
+<style>
+  body { margin: 0; background: #f0f7f9; color: #1c1c1e; font-family: -apple-system, "Hiragino Sans", sans-serif; }
+  .box { max-width: 560px; margin: 40px auto; padding: 0 20px; line-height: 1.8; }
+  h1 { color: #802028; font-size: 1.5rem; }
+  .card { background: #fff; border-radius: 16px; padding: 18px 20px; box-shadow: 0 4px 12px rgba(0,0,0,.08); margin-bottom: 16px; }
+  a.btn { display: block; text-align: center; background: #802028; color: #fff; text-decoration: none; padding: 12px; border-radius: 12px; font-weight: 700; }
+  .loading { text-align: center; color: #666; margin-top: 30vh; }
+</style>
+</head>
+<body>
+<div id="guide" class="box" style="display:none">
+  <h1>キクタンTOEIC990（iPad用）</h1>
+  <div class="card">
+    この画面のまま、共有ボタンから「ホーム画面に追加」を選んでください。<br>
+    ホーム画面から開くと、毎回最新の単語帳が読み込まれます。
+  </div>
+  <a class="btn" id="open" href="legacy.html">いまはSafariで単語帳を開く</a>
+</div>
+<div id="loading" class="loading" style="display:none">読み込み中…</div>
+<script>
+(function () {
+  var standalone = window.navigator.standalone === true;
+  if (standalone) {
+    // ホーム画面から開いたとき：毎回違うアドレスで本体を開く（古い保存内容を使わせない）
+    document.getElementById('loading').style.display = 'block';
+    location.replace('legacy.html?v=' + new Date().getTime() + location.hash);
+  } else {
+    document.getElementById('guide').style.display = 'block';
+  }
+})();
+</script>
+</body>
+</html>
