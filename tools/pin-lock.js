@@ -39,6 +39,55 @@
   function check(pin) { var p = saved(); return !!p && sha256(p.s + ':' + pin) === p.h; }
   function store(pin) { var salt = String(Math.random()).slice(2) + now(); lsSet(KEY, JSON.stringify({ s: salt, h: sha256(salt + ':' + pin) })); }
 
+  /* ---- Face ID・指紋など（WebAuthn）：端末の生体認証で開く。使えない端末は暗証番号だけ ---- */
+  var BIO = 'eibun_bio', bioAvail = false, bioBusy = false;
+  var ua = navigator.userAgent;
+  var BIO_NAME = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ? 'Face ID・Touch ID'
+    : /Android/.test(ua) ? '指紋・顔認証' : /Macintosh/.test(ua) ? 'Touch ID' : '生体認証';
+  function rnd(n) { var a = new Uint8Array(n); try { window.crypto.getRandomValues(a); } catch (e) { for (var i = 0; i < n; i++) a[i] = Math.floor(Math.random() * 256); } return a; }
+  function b64(buf) { var b = new Uint8Array(buf), s = ''; for (var i = 0; i < b.length; i++) s += String.fromCharCode(b[i]); return btoa(s); }
+  function unb64(t) { var s = atob(t), a = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) a[i] = s.charCodeAt(i); return a; }
+  function bioSaved() { try { var b = JSON.parse(lsGet(BIO) || 'null'); return b && b.id ? b : null; } catch (e) { return null; } }
+  try {
+    if (window.PublicKeyCredential && PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable && window.isSecureContext !== false) {
+      PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(function (v) { bioAvail = !!v; bioButton(); }, function () {});
+    }
+  } catch (e) {}
+  function bioRegister() {
+    if (!bioAvail) { alert('この端末では' + BIO_NAME + 'を使えません。'); return; }
+    navigator.credentials.create({ publicKey: {
+      challenge: rnd(32), rp: { name: '英文リーダー', id: location.hostname },
+      user: { id: rnd(16), name: 'eibun-reader', displayName: '英文リーダー・My単語帳' },
+      pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+      authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'discouraged', requireResidentKey: false },
+      attestation: 'none', timeout: 60000
+    } }).then(function (c) {
+      lsSet(BIO, JSON.stringify({ id: b64(c.rawId) }));
+      alert(BIO_NAME + 'を登録しました。ロック画面のボタンで開けます（暗証番号でも開けます）。');
+    }, function (e) { alert(BIO_NAME + 'を登録できませんでした（' + (e && e.name || 'エラー') + '）。'); });
+  }
+  function bioUnlock(auto) {
+    var b = bioSaved();
+    if (!b || !bioAvail || bioBusy || mode !== 'unlock') return;
+    bioBusy = true;
+    navigator.credentials.get({ publicKey: {
+      challenge: rnd(32), rpId: location.hostname, userVerification: 'required', timeout: 60000,
+      allowCredentials: [{ type: 'public-key', id: unb64(b.id), transports: ['internal'] }]
+    } }).then(function (c) {
+      bioBusy = false;
+      if (c && b64(c.rawId) === b.id && mode === 'unlock') { fails = 0; hide(); lastTick = now(); }
+    }, function (e) {
+      bioBusy = false;
+      if (!auto && mode === 'unlock') q('m').textContent = BIO_NAME + 'で開けませんでした。暗証番号を入れてください。';
+    });
+  }
+  function bioButton() {
+    var b = document.getElementById('pl-bio');
+    if (!b) return;
+    b.textContent = '🙂 ' + BIO_NAME + 'で開く';
+    b.style.display = mode === 'unlock' && bioAvail && bioSaved() ? 'block' : 'none';
+  }
+
   /* ---- 画面 ---- */
   var css = '#pl-ov{position:fixed;top:0;left:0;right:0;bottom:0;background:#24363f;z-index:2147483000;color:#fff;font-family:-apple-system,"Hiragino Sans",sans-serif;text-align:center;-webkit-user-select:none;user-select:none;overflow:auto}' +
     '#pl-ov .t{margin:12vh 0 10px;font-size:20px;font-weight:700}#pl-ov .m{min-height:22px;font-size:14px;opacity:.85;margin-bottom:14px;padding:0 16px}' +
@@ -57,6 +106,10 @@
     ov.appendChild(el('div', 't', ''));
     ov.appendChild(el('div', 'm', ''));
     ov.appendChild(el('div', 'd', ''));
+    var bio = el('button', '', ''); bio.type = 'button'; bio.id = 'pl-bio';
+    bio.style.cssText = 'display:none;margin:0 auto 14px;background:#fff;color:#24363f;border:0;border-radius:12px;padding:12px 26px;font-size:17px;font-weight:700';
+    bio.addEventListener('click', function () { bioUnlock(false); });
+    ov.appendChild(bio);
     var k = el('div', 'k');
     var keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'];
     for (var i = 0; i < keys.length; i++) (function (v) {
@@ -86,7 +139,7 @@
     q('t').textContent = title; q('m').textContent = msg || '';
     document.getElementById('pl-forgot').style.display = m === 'unlock' ? '' : 'none';
     document.getElementById('pl-cancel').style.display = m === 'unlock' ? 'none' : '';
-    ov.style.display = 'block'; dots();
+    ov.style.display = 'block'; dots(); bioButton();
   }
   function hide() { if (ov) ov.style.display = 'none'; mode = null; }
   function dots() { var s = ''; for (var i = 0; i < buf.length; i++) s += '●'; q('d').textContent = s || ' '; }
@@ -129,7 +182,12 @@
     }
   }
   function startSet() { show('set1', '暗証番号を決めてください', '4〜6桁の数字（英文リーダーと My単語帳 で共通）'); okButton().style.display = 'block'; }
-  function lock() { if (!saved()) return; show('unlock', '暗証番号を入力'); var b = document.getElementById('pl-ok'); if (b) b.style.display = 'none'; }
+  function lock() {
+    if (!saved()) return;
+    show('unlock', '暗証番号を入力'); var b = document.getElementById('pl-ok'); if (b) b.style.display = 'none';
+    // 端末によってはボタンを押さなくても顔認証などが始まる（だめならボタンで）
+    setTimeout(function () { bioUnlock(true); }, 300);
+  }
   function forgotPin() {
     if (!window.confirm('暗証番号を消して、この端末の英文リーダー・My単語帳の設定をやり直しますか？\n（クラウドの英文や単語は消えません。ほかの端末で表示したペアリングコードで設定し直してください）')) return;
     var del = [];
@@ -148,7 +206,9 @@
     if (saved()) {
       add('🔒 今すぐロック', lock);
       add('暗証番号を変える', function () { verifyThen(startSet); });
-      add('暗証番号をやめる', function () { verifyThen(function () { lsDel(KEY); alert('暗証番号をやめました。'); }); });
+      if (bioAvail && !bioSaved()) add('🙂 ' + BIO_NAME + 'を登録する', bioRegister);
+      if (bioSaved()) add(BIO_NAME + 'をやめる', function () { lsDel(BIO); alert(BIO_NAME + 'をやめました（暗証番号だけになります）。'); });
+      add('暗証番号をやめる', function () { verifyThen(function () { lsDel(KEY); lsDel(BIO); alert('暗証番号をやめました。'); }); });
     } else add('🔒 暗証番号を設定する', startSet);
     document.body.appendChild(m);
   }
