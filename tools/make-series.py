@@ -38,6 +38,8 @@ SERIES = {
         'keyname': 'eibun_key', 'pair_app': '英文リーダー',
         # 英文リーダーと共通の暗証番号ロック（tools/pin-lock.js を埋め込む）
         'pin': True,
+        # Android で「すでにインストール済み」と出て入れられなかったため、アプリの id を変えた
+        'appid': 'kikutan-my-2',
     },
     'kiku-memo': {
         'title': 'メモ単語帳', 'short': 'メモ単語帳', 'color': '#2E7D6B',
@@ -53,7 +55,7 @@ SERIES = {
     },
 }
 
-SW_VERSION = 'v13'
+SW_VERSION = 'v14'
 
 
 def must_replace(s, old, new, label, count=None):
@@ -106,7 +108,7 @@ def make_manifest(cfg):
              {'src': './icons/icon-512.png', 'sizes': '512x512', 'type': 'image/png'},
              {'src': './icons/maskable-192.png', 'sizes': '192x192', 'type': 'image/png', 'purpose': 'maskable'},
              {'src': './icons/maskable-512.png', 'sizes': '512x512', 'type': 'image/png', 'purpose': 'maskable'}]
-    return json.dumps({'id': '/' + cfg['repo'] + '/?app=' + cfg['cache'], 'name': cfg['title'], 'short_name': cfg['short'],
+    return json.dumps({'id': '/' + cfg['repo'] + '/?app=' + cfg.get('appid', cfg['cache']), 'name': cfg['title'], 'short_name': cfg['short'],
                        'start_url': './?source=pwa', 'scope': './', 'display': 'standalone',
                        'background_color': cfg['color'], 'theme_color': cfg['color'], 'icons': icons},
                       ensure_ascii=False, indent=2) + '\n'
