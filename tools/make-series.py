@@ -36,6 +36,8 @@ SERIES = {
         'manifest': True, 'repo': 'kiku-my',
         # 英文リーダー（独立アプリ）と同じ、ほかとは別の合言葉を使う
         'keyname': 'eibun_key', 'pair_app': '英文リーダー',
+        # 英文リーダーと共通の暗証番号ロック（tools/pin-lock.js を埋め込む）
+        'pin': True,
     },
     'kiku-memo': {
         'title': 'メモ単語帳', 'short': 'メモ単語帳', 'color': '#2E7D6B',
@@ -51,7 +53,7 @@ SERIES = {
     },
 }
 
-SW_VERSION = 'v11'
+SW_VERSION = 'v12'
 
 
 def must_replace(s, old, new, label, count=None):
@@ -81,6 +83,13 @@ def make_index(cfg, data):
                          ('手書きメモでもう一度表示してください', app + 'でもう一度表示してください'),
                          ('このQRコードは手書きメモの合言葉ではありません', 'このQRコードは' + app + 'の合言葉ではありません')]:
             s = must_replace(s, old, new, 'pair text: ' + old[:12])
+    if cfg.get('pin'):
+        js = open(os.path.join(HERE, 'pin-lock.js'), encoding='utf-8').read()
+        s = must_replace(s, '</body>', '<script>\n' + js + '</script>\n</body>', 'pin', 1)
+        s = must_replace(s, '<div id="cloud-msg" style="font-size:0.85rem; color:#ae2012; min-height:1em;"></div>',
+                         '<div id="cloud-msg" style="font-size:0.85rem; color:#ae2012; min-height:1em;"></div>\n'
+                         '            <div style="font-size:0.82rem; color:#777; line-height:1.6; margin-top:8px;">暗証番号を設定すると、開いたときと、10分以上離れて戻ったときに聞きます（英文リーダーと共通・この端末だけ）。</div>\n'
+                         '            <div id="pl-slot" data-cls="btn-outline btn-block"></div>', 'pin slot', 1)
     if data is not None:
         if '`' in data or '${' in data:
             raise SystemExit('単語データに ` または ${ が含まれています')
