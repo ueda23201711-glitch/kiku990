@@ -40,12 +40,15 @@ SERIES = {
         'pin': True,
         # Android で「すでにインストール済み」と出て入れられなかったため、アプリの id を変えた
         'appid': 'kikutan-my-2',
+        # 単語のメモの「📖 元の英文」で開くアプリ
+        'srcapp': '/eibun-reader/',
     },
     'kiku-memo': {
         'title': 'メモ単語帳', 'short': 'メモ単語帳', 'color': '#2E7D6B',
         'prefix': 'kikutan_memo__', 'node': 'memovocab', 'cache': 'kikutan-memo',
         # 手書きメモの中の英文リーダーで保存した単語・熟語の単語帳（合言葉は手書きメモと同じ）
         'manifest': True, 'repo': 'kiku-memo',
+        'srcapp': '/tegaki-memo/',
     },
     'kiku800': {
         'title': 'キクタンTOEIC800', 'short': 'TOEIC800', 'color': '#407C42',
@@ -55,7 +58,7 @@ SERIES = {
     },
 }
 
-SW_VERSION = 'v14'
+SW_VERSION = 'v15'
 
 
 def must_replace(s, old, new, label, count=None):
@@ -85,6 +88,8 @@ def make_index(cfg, data):
                          ('手書きメモでもう一度表示してください', app + 'でもう一度表示してください'),
                          ('このQRコードは手書きメモの合言葉ではありません', 'このQRコードは' + app + 'の合言葉ではありません')]:
             s = must_replace(s, old, new, 'pair text: ' + old[:12])
+    if cfg.get('srcapp'):
+        s = must_replace(s, "const SRC_APP = '';", "const SRC_APP = '" + cfg['srcapp'] + "';", 'srcapp', 1)
     if cfg.get('pin'):
         js = open(os.path.join(HERE, 'pin-lock.js'), encoding='utf-8').read()
         s = must_replace(s, '</body>', '<script>\n' + js + '</script>\n</body>', 'pin', 1)
