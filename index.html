@@ -1712,6 +1712,8 @@ function openNoteSrc(e) {
     // 暗証番号ロックがあるとき：いま開いているので、英文リーダー側で聞き直さないよう通行証を付ける
     const tk = window.PinLock && window.PinLock.ticket ? window.PinLock.ticket() : '';
     if (tk) url += '&ok=' + tk;
+    // 置き手紙：英文リーダーが前の画面のまま前に出てくるだけの端末でも、これを見て元の英文を開く
+    try { localStorage.setItem('eibun_jump', JSON.stringify({ h: url.slice(url.indexOf('#')), t: Date.now() })); } catch (er) {}
     window.open(url, '_blank');
 }
 function toggleNoteJa(e) {

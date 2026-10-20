@@ -58,7 +58,7 @@ SERIES = {
     },
 }
 
-SW_VERSION = 'v16'
+SW_VERSION = 'v17'
 
 
 def must_replace(s, old, new, label, count=None):
