@@ -230,9 +230,32 @@
     document.body.appendChild(b);
   }
 
+  /* ---- 引き継ぎ（My単語帳 →「元の英文」→ 英文リーダー）：開いている側が短い通行証を付けて渡す ----
+     通行証 = 時刻 + sha256(合言葉:時刻)。合言葉を知っている端末だけが作れ、2分で切れる。
+     ホーム画面アプリとブラウザで保存場所が分かれていても、合言葉は両方にあるので確かめられる */
+  var PASS_MS = 2 * 60 * 1000, passUntil = 0;
+  function appKey() { return lsGet('eibun_key') || ''; }
+  function ticket() {
+    var key = appKey();
+    if (!key || mode === 'unlock') return '';
+    var t = String(now());
+    return t + '.' + sha256(key + ':' + t + ':pin-pass').slice(0, 32);
+  }
+  function usePass(tk) {
+    var m = /^(\d+)\.([0-9a-f]{32})$/.exec(String(tk || '')), key = appKey();
+    if (!m || !key) return false;
+    var t = Number(m[1]), used = lsGet('eibun_pass_used');
+    if (Math.abs(now() - t) > PASS_MS || used === m[1]) return false;
+    if (sha256(key + ':' + m[1] + ':pin-pass').slice(0, 32) !== m[2]) return false;
+    lsSet('eibun_pass_used', m[1]);
+    passUntil = now() + 5000; lastTick = now(); hiddenAt = 0;
+    if (mode === 'unlock') { fails = 0; hide(); }
+    return true;
+  }
+
   /* ---- いつ聞くか ---- */
   var lastTick = now(), hiddenAt = 0;
-  function maybeLock() { if (saved() && mode !== 'unlock') lock(); }
+  function maybeLock() { if (saved() && mode !== 'unlock' && now() > passUntil) lock(); }
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) hiddenAt = now();
     else if (hiddenAt && now() - hiddenAt >= AWAY_MS) maybeLock();
@@ -241,7 +264,13 @@
   // iPad 2/3 のホーム画面アプリなど、切り替えの合図が来ないとき：時計の進み方で離れていた時間を見る
   setInterval(function () { var t = now(); if (t - lastTick >= AWAY_MS) maybeLock(); lastTick = t; }, 20000);
 
-  function init() { addButton(); if (saved()) lock(); }
+  // ページ側がアドレスの #…&ok=通行証 を先に読んで消すことがあるので、window.__pinPass でも受け取る
+  function hashPass() { var m = /[#&]ok=([0-9]+\.[0-9a-f]+)/.exec(location.hash); return m ? m[1] : ''; }
+  function init() {
+    addButton();
+    var tk = window.__pinPass || hashPass(); window.__pinPass = '';
+    if (saved() && !(tk && usePass(tk))) lock();
+  }
   if (document.body) init(); else document.addEventListener('DOMContentLoaded', init);
-  window.PinLock = { lock: lock, setup: startSet, menu: menu };
+  window.PinLock = { lock: lock, setup: startSet, menu: menu, ticket: ticket, pass: usePass };
 })();
