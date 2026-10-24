@@ -762,6 +762,8 @@ if (window.navigator.standalone === true && !/[?&]v=/.test(location.search)) { l
             <div id="cloud-msg" style="font-size:0.85rem; color:#ae2012; min-height:1em;"></div>
         </div>
 
+        <button class="btn-primary btn-block" id="btn-review" onclick="startApp('review')">🔁 今日の復習</button>
+        <div id="review-note" style="text-align:center; font-size:0.8rem; color:#888; margin:-4px 0 6px; line-height:1.5;"></div>
         <button class="btn-primary btn-block hidden" id="btn-resume" onclick="resumeStudy()">▶ 続きから</button>
         <button class="btn-primary btn-block" onclick="startApp('card')">フラッシュカード開始</button>
         <button class="btn-secondary btn-block" onclick="startApp('listen')">聞き流しモード開始</button>
@@ -1341,6 +1343,7 @@ function srcNote() {
 function handleSrcChange(v) {
   lsSet('src_pick', v);
   srcNote();
+  renderReview();
 }
 function refreshMainStats() {
   // 登録数は「番号の最小〜最大」から算出（例: 707〜2126 → 1420語）
@@ -1760,12 +1763,17 @@ function syncSchedule(ms) {
 }
 function syncPayload(type, n, t) {
   if (type === 'st') {
-    var s = getStatus(n);
-    return {
-      level: Number(s.level) || 0,
-      result: s.result || 'new',
-      t: t
-    };
+    var s = getStatus(n),
+      o = {
+        level: Number(s.level) || 0,
+        result: s.result || 'new',
+        t: t
+      };
+    if (s.due) {
+      o.due = s.due;
+      o.iv = s.iv || 0;
+    }
+    return o;
   }
   if (type === 'tx') return {
     v: localStorage.getItem(memoTextKey(n)) || '',
@@ -1859,10 +1867,15 @@ function syncMerge(srv) {
   var changed = false;
   syncEach(srv.st, function (n, v) {
     if (syncDirty['st/' + n] || (v.t || 0) <= (syncMeta.st[n] || 0)) return;
-    localStorage.setItem(k('stat_' + n), JSON.stringify({
+    var o = {
       level: Number(v.level) || 0,
       result: v.result || 'new'
-    }));
+    };
+    if (v.due) {
+      o.due = v.due;
+      o.iv = v.iv || 0;
+    }
+    localStorage.setItem(k('stat_' + n), JSON.stringify(o));
     syncMeta.st[n] = v.t;
     changed = true;
   });
@@ -1895,6 +1908,7 @@ function syncMerge(srv) {
   syncSave();
   if (changed) {
     refreshMainStats();
+    renderReview();
     if (cur) {
       var st = getStatus(cur);
       document.getElementById('badge-lv').innerText = 'LV.' + st.level;
@@ -1937,6 +1951,7 @@ function resumeNext() {
   return nums.length ? Math.min.apply(null, nums) : null;
 }
 function renderResume() {
+  renderReview();
   var btn = document.getElementById('btn-resume');
   if (!btn) return;
   var next = resumeNext();
@@ -2083,7 +2098,7 @@ function startApp(mode, startAtN) {
   var onlyReview = document.getElementById('chkReview').checked;
   var filterLevel = document.getElementById('selLevel').value;
   var srcPick = document.getElementById('selSrc') ? document.getElementById('selSrc').value : '';
-  studyQueue = words.filter(function (item) {
+  studyQueue = mode === 'review' ? reviewList() : words.filter(function (item) {
     var itemNo = Number(item.n);
     if (srcPick) {
       if (!srcMatch(item, srcPick)) return false;
@@ -2095,7 +2110,7 @@ function startApp(mode, startAtN) {
     return true;
   });
   if (studyQueue.length === 0) {
-    alert("条件に一致する単語がありません。");
+    alert(mode === 'review' ? '今日の復習はありません。' : "条件に一致する単語がありません。");
     return;
   }
   currentIndex = 0;
@@ -2477,10 +2492,74 @@ function speak(text, lang, callback) {
     if (!synth.speaking) finish();
   }, fallbackMs);
 }
+
+// ---- 今日の復習（忘れかけるころにもう一度出す） ----
+// わかる：前の間隔の約2.2倍あとに（初めては理解度に合わせて1〜14日後）／わからない：10分後にもう一度
+var DAY = 24 * 60 * 60 * 1000;
+function srsSchedule(st, known) {
+  if (known) {
+    var base = [1, 1, 2, 4, 7, 14][Number(st.level) || 0] || 1;
+    st.iv = st.iv ? Math.min(180, Math.max(base, Math.round(st.iv * 2.2))) : base;
+    st.due = Date.now() + st.iv * DAY;
+  } else {
+    st.iv = 0;
+    st.due = Date.now() + 10 * 60 * 1000;
+  }
+}
+// 今日（きょうの終わりまで）に復習する単語
+function reviewList() {
+  var end = new Date();
+  end.setHours(23, 59, 59, 999);
+  if (end.getTime() < Date.now() + 60 * 60 * 1000) end.setTime(Date.now() + 60 * 60 * 1000); // 夜遅くの「わからない」もその日のうちに
+  var src = document.getElementById('selSrc') ? document.getElementById('selSrc').value : '';
+  var out = [];
+  words.forEach(function (item) {
+    if (src && !srcMatch(item, src)) return;
+    var st = getStatus(item.n);
+    if (st.due ? st.due <= end.getTime() : st.result === 'unknown') out.push({
+      item: item,
+      due: st.due || 0
+    });
+  });
+  out.sort(function (a, b) {
+    return a.due - b.due || a.item.n - b.item.n;
+  });
+  return out.map(function (x) {
+    return x.item;
+  });
+}
+function nextReviewText() {
+  var src = document.getElementById('selSrc') ? document.getElementById('selSrc').value : '';
+  var min = 0,
+    cnt = 0;
+  var end = new Date();
+  end.setHours(23, 59, 59, 999);
+  words.forEach(function (item) {
+    if (src && !srcMatch(item, src)) return;
+    var st = getStatus(item.n);
+    if (st.due && st.due > end.getTime()) {
+      if (!min || st.due < min) min = st.due;
+      cnt++;
+    }
+  });
+  if (!min) return '';
+  var d = new Date(min),
+    days = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(end.getFullYear(), end.getMonth(), end.getDate())) / DAY);
+  return '次の復習は' + (days <= 1 ? '明日' : days + '日後') + '（予定に入っている単語 ' + cnt + '語）';
+}
+function renderReview() {
+  var btn = document.getElementById('btn-review');
+  if (!btn) return;
+  var n = reviewList().length;
+  btn.textContent = n ? '🔁 今日の復習（' + n + '語）' : '🔁 今日の復習はありません';
+  btn.disabled = !n;
+  document.getElementById('review-note').textContent = n ? '' : nextReviewText();
+}
 function answer(isKnown) {
   var item = studyQueue[currentIndex];
   var st = getStatus(item.n);
   st.result = isKnown ? 'known' : 'unknown';
+  srsSchedule(st, isKnown);
   saveStatus(item.n, st);
   showSwipeHint(isKnown ? "わかる" : "わからない");
   setTimeout(function () {
