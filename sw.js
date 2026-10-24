@@ -1,4 +1,4 @@
-const CACHE_NAME = "kikutan-toeic990-v8";
+const CACHE_NAME = "kikutan-toeic990-v9";
 const ASSETS = [
   "./",
   "./index.html",

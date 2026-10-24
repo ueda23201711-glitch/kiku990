@@ -583,6 +583,12 @@
             </div>
         </div>
 
+        <div class="panel hidden" id="src-panel">
+            <div class="config-row"><label for="selSrc">📚 本・英文ごと</label></div>
+            <select id="selSrc" onchange="handleSrcChange(this.value)" style="width:100%; margin-top:5px;"></select>
+            <div id="src-note" style="font-size:0.8rem; color:#888; margin-top:6px; line-height:1.5;"></div>
+        </div>
+
         <div class="panel">
             <div class="config-row">
                 <label>学習範囲 (No.)</label>
@@ -690,6 +696,7 @@
 
             <div id="txt-word" class="word-text" onclick="playWord(event)">Word</div>
             <div id="txt-meaning" class="meaning-text hidden">意味</div>
+            <div id="txt-src" style="font-size:0.8rem; color:#999; margin-top:6px;"></div>
 
             <button id="btn-show-meaning" class="btn-neutral" style="margin-top:10px; font-size:0.85rem; padding:8px 18px; border-radius:20px;" onclick="revealMeaning()">
                 日本語訳を表示
@@ -772,6 +779,7 @@
                 <option value="4">LV.4</option>
                 <option value="5">LV.5 (完璧)</option>
             </select>
+            <select id="selListSrc" class="hidden" onchange="renderListTable()" style="flex:1"></select>
             <select id="selListResultFilter" onchange="renderListTable()" style="flex:1">
                 <option value="all">全結果</option>
                 <option value="unknown">「わからない」のみ</option>
@@ -1062,9 +1070,42 @@ function parseData() {
     words = lines.map(line => {
         const parts = line.split('\t');
         if (parts.length < 3) return null;
-        return { w: parts[0].trim(), m: parts[1].trim(), n: parseInt(parts[2].trim()) };
+        return { w: parts[0].trim(), m: parts[1].trim(), n: parseInt(parts[2].trim()), s: (parts[3] || '').trim() };
     }).filter(x => x);
+    renderSrcOptions();
 }
+// 本・英文ごと（英文リーダーで保存した単語の4つ目の列＝出典）
+function srcList() {
+    const map = {};
+    words.forEach(w => { if (!w.s) return; const x = map[w.s] || (map[w.s] = { s: w.s, c: 0, a: w.n, b: w.n }); x.c++; x.a = Math.min(x.a, w.n); x.b = Math.max(x.b, w.n); });
+    return Object.keys(map).map(k => map[k]).sort((x, y) => y.b - x.b);   // 新しく保存した本から
+}
+function renderSrcOptions() {
+    const sel = document.getElementById('selSrc'), sel2 = document.getElementById('selListSrc');
+    if (!sel) return;
+    const list = srcList(), keep = lsGet('src_pick') || '';
+    document.getElementById('src-panel').className = list.length ? 'panel' : 'panel hidden';
+    if (sel2) sel2.className = list.length ? '' : 'hidden';
+    [sel, sel2].forEach((el, i) => {
+        if (!el) return;
+        const cur = i === 0 ? keep : el.value;
+        el.innerHTML = '';
+        const o0 = document.createElement('option'); o0.value = ''; o0.textContent = i === 0 ? 'すべての本・英文の単語' : '全部の本・英文'; el.appendChild(o0);
+        const none = words.filter(w => !w.s).length;
+        list.forEach(x => { const o = document.createElement('option'); o.value = x.s; o.textContent = '📚 ' + x.s + '（' + x.c + '語）'; el.appendChild(o); });
+        if (none) { const o = document.createElement('option'); o.value = '__none__'; o.textContent = '（どこから保存したか分からない単語 ' + none + '語）'; el.appendChild(o); }
+        el.value = cur; if (el.value !== cur) el.value = '';
+    });
+    srcNote();
+}
+function srcMatch(item, v) { return !v || (v === '__none__' ? !item.s : item.s === v); }
+function srcNote() {
+    const v = document.getElementById('selSrc').value, note = document.getElementById('src-note');
+    if (!v) { note.textContent = ''; return; }
+    const ws = words.filter(w => srcMatch(w, v));
+    note.textContent = 'この本・英文から保存した ' + ws.length + ' 語で学習します（下の「学習範囲」の番号は使いません）。';
+}
+function handleSrcChange(v) { lsSet('src_pick', v); srcNote(); }
 
 function refreshMainStats() {
     // 登録数は「番号の最小〜最大」から算出（例: 707〜2126 → 1420語）
@@ -1566,10 +1607,12 @@ function startApp(mode, startAtN) {
     const endNum = Number(document.getElementById('inpEnd').value.trim()) || 9999;
     const onlyReview = document.getElementById('chkReview').checked;
     const filterLevel = document.getElementById('selLevel').value;
+    const srcPick = document.getElementById('selSrc') ? document.getElementById('selSrc').value : '';
 
     studyQueue = words.filter(item => {
         const itemNo = Number(item.n);
-        if (itemNo < startNum || itemNo > endNum) return false;
+        if (srcPick) { if (!srcMatch(item, srcPick)) return false; }   // 本・英文ごと：番号の範囲は使わない
+        else if (itemNo < startNum || itemNo > endNum) return false;
         const st = getStatus(item.n);
         if (onlyReview && st.result !== 'unknown') return false;
         if (filterLevel !== 'all' && String(st.level) !== String(filterLevel)) return false;
@@ -1612,6 +1655,7 @@ function renderCard() {
     document.getElementById('progress-text').innerText = `${currentIndex + 1} / ${studyQueue.length} (No.${item.n})`;
     document.getElementById('txt-word').innerText = item.w;
     document.getElementById('txt-meaning').innerText = item.m;
+    document.getElementById('txt-src').innerText = item.s ? '📚 ' + item.s : '';
     document.getElementById('txt-meaning').classList.add('hidden');
     document.getElementById('btn-show-meaning').classList.remove('hidden');
 
@@ -2368,11 +2412,13 @@ function renderListTable() {
     const tbody = document.querySelector('#list-table tbody');
     const filterLv = document.getElementById('selListLevelFilter').value;
     const filterResult = document.getElementById('selListResultFilter').value;
+    const filterSrc = document.getElementById('selListSrc') ? document.getElementById('selListSrc').value : '';
     tbody.innerHTML = '';
     const fragment = document.createDocumentFragment();
 
     words.forEach(item => {
         const st = getStatus(item.n);
+        if (!srcMatch(item, filterSrc)) return;
         if (filterLv !== 'all' && String(st.level) !== filterLv) return;
         if (filterResult !== 'all') {
             if (filterResult === 'unknown' && st.result !== 'unknown') return;
@@ -2380,7 +2426,7 @@ function renderListTable() {
         }
         const tr = document.createElement('tr');
         tr.innerHTML = `<td>${item.n}</td>
-            <td><div style="font-weight:bold; color:var(--primary)">${item.w}</div><div style="font-size:0.8em; color:#666">${item.m}</div></td>
+            <td><div style="font-weight:bold; color:var(--primary)">${item.w}</div><div style="font-size:0.8em; color:#666">${item.m}</div>${item.s ? `<div style="font-size:0.75em; color:#999">📚 ${item.s.replace(/[<>&]/g, '')}</div>` : ''}</td>
             <td style="text-align:center"><select onchange="updateLv(${item.n}, this.value)">
                 ${[0,1,2,3,4,5].map(v => `<option value="${v}" ${st.level==v?'selected':''}>${v}</option>`).join('')}
             </select></td>`;
